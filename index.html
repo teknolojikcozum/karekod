@@ -243,13 +243,36 @@
         // Kimlik Doğrulama
         const initAuth = async () => {
             try {
-                if (isCanvasEnv && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                // Eğer kendi veritabanınızı kullanıyorsanız Canvas test tokenını kullanma, anonim giriş yap.
+                if (!MY_FIREBASE_CONFIG && isCanvasEnv && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
                     await signInAnonymously(auth); // Gerçek GitHub sayfanızda anonim giriş kullanılır
                 }
             } catch (error) {
                 console.error("Kimlik doğrulama hatası:", error);
+                
+                // Kimlik Doğrulama hatası yakalandığında ekranda gösterilecek şık uyarı:
+                const errorDiv = document.createElement('div');
+                errorDiv.className = "fixed inset-0 bg-slate-900/95 z-[100] flex flex-col items-center justify-center p-6 text-center text-white backdrop-blur-md";
+                errorDiv.innerHTML = `
+                    <div class="bg-slate-800 p-8 rounded-3xl border border-red-500 max-w-lg shadow-2xl">
+                        <svg class="w-20 h-20 text-red-500 mx-auto mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        <h2 class="text-3xl font-bold mb-4 text-red-400">Küçük Bir Adım Kaldı!</h2>
+                        <p class="text-slate-300 mb-4 leading-relaxed">
+                            Firebase projenizde <b>Anonim Giriş (Anonymous Auth)</b> henüz aktif edilmemiş. Bu yüzden sisteminiz veritabanına giriş yapamıyor.
+                        </p>
+                        <div class="bg-slate-900 p-4 rounded-xl text-sm text-left text-slate-400 mb-6 border border-slate-700 leading-relaxed">
+                            1. <a href="https://console.firebase.google.com/" target="_blank" class="text-blue-400 underline">Firebase Console</a>'a gidin ve projenizi seçin.<br>
+                            2. Sol menüden <b>Authentication</b>'a (Kimlik Doğrulama) tıklayın.<br>
+                            3. <b>Get Started</b> (Başlayın) butonuna tıklayın.<br>
+                            4. <b>Sign-in method</b> (Giriş Yöntemi) sekmesine geçin.<br>
+                            5. <b>Anonymous</b> (Anonim) seçeneğini bulup <b>Enable</b> (Etkinleştir) yapın ve <b>Save</b> (Kaydet) deyin.
+                        </div>
+                        <button onclick="window.location.reload()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-8 rounded-xl transition">Ayarları Yaptım, Sayfayı Yenile</button>
+                    </div>
+                `;
+                document.body.appendChild(errorDiv);
             }
         };
 
