@@ -148,86 +148,125 @@
     </div>
 
 
-    <script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
         // İkonları başlat
         lucide.createIcons();
 
-        // Uygulama Durumu (State)
+        // Firebase Yapılandırması ve Başlatma
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : '{"projectId":"mock-project"}';
+        const firebaseConfig = JSON.parse(firebaseConfigStr);
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Global State (Uygulama Durumu)
+        let currentUser = null;
         let timerInterval;
         let isQrActive = false;
         let qrCodeObj = null;
-        let attendanceData = JSON.parse(localStorage.getItem('yoklama_listesi')) || [];
+        let attendanceData = [];
+        let unsubscribeSnapshot = null;
         const TIMER_SECONDS = 300; // 5 dakika
 
-        // URL Analizi (Hangi ekrandayız?)
+        // URL Analizi
         const urlParams = new URLSearchParams(window.location.search);
         const isStudentMode = urlParams.get('mode') === 'student';
-        const currentSession = urlParams.get('session');
+        let currentSession = urlParams.get('session');
 
+        // UI Başlangıç Ayarları
         if (isStudentMode) {
             document.getElementById('teacherView').classList.add('hidden');
             document.getElementById('studentView').classList.remove('hidden');
             document.getElementById('studentView').classList.add('flex');
             
-            // Eğer aktif bir oturum yoksa veya süre dolduysa form açılmasın (Basit güvenlik)
-            const activeSession = localStorage.getItem('active_session');
-            if(currentSession !== activeSession) {
-                document.getElementById('studentForm').innerHTML = '<div class="text-red-500 text-center font-bold">Geçersiz veya süresi dolmuş karekod!</div>';
+            if(!currentSession) {
+                document.getElementById('studentForm').innerHTML = '<div class="text-red-500 text-center font-bold">Geçersiz veya hatalı karekod bağlantısı!</div>';
             }
         } else {
             document.getElementById('teacherView').classList.remove('hidden');
             document.getElementById('teacherView').classList.add('flex');
+            // Eğer öğretmense ve yarım kalan bir oturum varsa geri yükle
+            if(!currentSession && localStorage.getItem('active_session')) {
+                currentSession = localStorage.getItem('active_session');
+            }
             renderList();
         }
 
+        // Kimlik Doğrulama İşlemleri (Bulut veritabanına erişim izni için)
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Kimlik doğrulama hatası:", error);
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            // Öğretmen oturum açtığında ve aktif bir oturum varsa veritabanını dinlemeye başla
+            if (user && !isStudentMode && currentSession) {
+                listenToSession(currentSession);
+            }
+        });
+
+        initAuth();
+
+        // Ortak Collection Referansı Üretici
+        const getSessionCollection = (sessionId) => {
+            return collection(db, 'artifacts', appId, 'public', 'data', 'yoklama_' + sessionId);
+        };
+
         // --- ÖĞRETMEN FONKSİYONLARI ---
 
-        function startQrSession() {
-            // Önceki durumu temizle
+        window.startQrSession = () => {
+            if (!currentUser) return alert("Veritabanına bağlanılıyor, lütfen 1-2 saniye bekleyip tekrar deneyin.");
+
             clearInterval(timerInterval);
             document.getElementById('qrcode').innerHTML = '';
             document.getElementById('expiredMessage').classList.add('hidden');
             
-            // Yeni benzersiz oturum kimliği oluştur
-            const sessionId = Math.random().toString(36).substring(2, 15);
-            localStorage.setItem('active_session', sessionId);
+            // Yeni oturum kimliği
+            currentSession = Math.random().toString(36).substring(2, 15);
+            localStorage.setItem('active_session', currentSession);
             isQrActive = true;
 
-            // Öğrencinin gideceği link (Bulunduğumuz sayfa URL'sine parametre ekleyerek)
-            // Not: Gerçek hayatta burası sunucudaki bir URL olur.
             const baseUrl = window.location.href.split('?')[0];
-            const studentUrl = `${baseUrl}?mode=student&session=${sessionId}`;
+            const studentUrl = `${baseUrl}?mode=student&session=${currentSession}`;
 
-            // Karekodu oluştur
             qrCodeObj = new QRCode(document.getElementById("qrcode"), {
                 text: studentUrl,
-                width: 200,
-                height: 200,
-                colorDark : "#312e81", // indigo-900
-                colorLight : "#ffffff",
+                width: 200, height: 200,
+                colorDark : "#312e81", colorLight : "#ffffff",
                 correctLevel : QRCode.CorrectLevel.H
             });
 
-            // UI Güncellemeleri
             document.getElementById('qrcode').classList.remove('hidden');
             document.getElementById('timerDisplay').classList.remove('hidden');
             document.getElementById('startQrBtn').innerHTML = '<i data-lucide="refresh-cw"></i> Karekodu Yenile';
             lucide.createIcons();
 
             startTimer(TIMER_SECONDS);
-        }
+            listenToSession(currentSession);
+        };
 
         function startTimer(duration) {
             let timer = duration;
             const display = document.getElementById('timerDisplay');
-            
-            // İlk anı hemen göster
             updateTimerUI(timer, display);
 
             timerInterval = setInterval(function () {
                 timer--;
                 updateTimerUI(timer, display);
-
                 if (timer <= 0) {
                     clearInterval(timerInterval);
                     endQrSession();
@@ -238,13 +277,10 @@
         function updateTimerUI(secondsLeft, displayElement) {
             let minutes = parseInt(secondsLeft / 60, 10);
             let seconds = parseInt(secondsLeft % 60, 10);
-
             minutes = minutes < 10 ? "0" + minutes : minutes;
             seconds = seconds < 10 ? "0" + seconds : seconds;
-
             displayElement.textContent = minutes + ":" + seconds;
 
-            // Son 30 saniye kırmızı uyarı
             if(secondsLeft <= 30) {
                 displayElement.classList.remove('text-indigo-600');
                 displayElement.classList.add('text-red-500', 'animate-pulse');
@@ -256,12 +292,31 @@
 
         function endQrSession() {
             isQrActive = false;
-            localStorage.removeItem('active_session');
             document.getElementById('qrcode').classList.add('hidden');
             document.getElementById('timerDisplay').classList.add('hidden');
             document.getElementById('expiredMessage').classList.remove('hidden');
             document.getElementById('startQrBtn').innerHTML = '<i data-lucide="qr-code"></i> Yeni Karekod Oluştur';
             lucide.createIcons();
+        }
+
+        function listenToSession(sessionId) {
+            if (unsubscribeSnapshot) unsubscribeSnapshot(); // Önceki dinleyiciyi kapat
+            
+            const colRef = getSessionCollection(sessionId);
+            
+            // Veritabanındaki değişiklikleri anlık dinle (Canlı Senkronizasyon)
+            unsubscribeSnapshot = onSnapshot(colRef, (snapshot) => {
+                attendanceData = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                
+                // Zaman damgasına göre sırala (Yeni gelenler en üstte)
+                attendanceData.sort((a, b) => b.timestamp - a.timestamp);
+                renderList();
+            }, (error) => {
+                console.error("Veri çekme hatası:", error);
+            });
         }
 
         // --- CRUD İŞLEMLERİ (ÖĞRETMEN) ---
@@ -279,10 +334,7 @@
             } else {
                 emptyState.classList.add('hidden');
                 
-                // Tersten sırala (En son eklenen en üstte)
-                const sortedData = [...attendanceData].reverse();
-
-                sortedData.forEach(student => {
+                attendanceData.forEach(student => {
                     const li = document.createElement('li');
                     li.className = "bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center group transition-all hover:shadow-md";
                     
@@ -315,15 +367,18 @@
             }
         }
 
-        function deleteStudent(id) {
+        window.deleteStudent = async (id) => {
+            if(!currentUser) return;
             if(confirm("Bu öğrenciyi yoklama listesinden silmek istediğinize emin misiniz?")) {
-                attendanceData = attendanceData.filter(s => s.id !== id);
-                saveDataLocally();
-                renderList();
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'yoklama_' + currentSession, id));
+                } catch(error) {
+                    console.error("Silme hatası:", error);
+                }
             }
-        }
+        };
 
-        function openEditModal(id) {
+        window.openEditModal = (id) => {
             const student = attendanceData.find(s => s.id === id);
             if(student) {
                 document.getElementById('editId').value = student.id;
@@ -331,55 +386,54 @@
                 document.getElementById('editStdName').value = student.name;
                 document.getElementById('editModal').classList.remove('hidden');
             }
-        }
+        };
 
-        function closeEditModal() {
+        window.closeEditModal = () => {
             document.getElementById('editModal').classList.add('hidden');
-        }
+        };
 
-        function saveEdit() {
+        window.saveEdit = async () => {
+            if(!currentUser) return;
             const id = document.getElementById('editId').value;
             const newNo = document.getElementById('editStdNo').value.trim();
             const newName = document.getElementById('editStdName').value.trim();
 
             if(!newNo || !newName) return alert("Lütfen boş alan bırakmayın.");
 
-            const index = attendanceData.findIndex(s => s.id === id);
-            if(index !== -1) {
-                attendanceData[index].number = newNo;
-                attendanceData[index].name = newName;
-                saveDataLocally();
-                renderList();
-                closeEditModal();
+            try {
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'yoklama_' + currentSession, id), {
+                    number: newNo,
+                    name: newName
+                });
+                window.closeEditModal();
+            } catch(error) {
+                console.error("Güncelleme hatası:", error);
             }
-        }
+        };
 
-        function clearList() {
+        window.clearList = async () => {
+            if(!currentUser || attendanceData.length === 0) return;
             if(confirm("Tüm listeyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) {
-                attendanceData = [];
-                saveDataLocally();
-                renderList();
+                try {
+                    for(const student of attendanceData) {
+                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'yoklama_' + currentSession, student.id));
+                    }
+                } catch(error) {
+                    console.error("Toplu silme hatası:", error);
+                }
             }
-        }
+        };
 
-        function saveDataLocally() {
-            localStorage.setItem('yoklama_listesi', JSON.stringify(attendanceData));
-        }
-
-        // --- EXCEL/CSV İNDİRME ---
-
-        function downloadExcel() {
+        window.downloadExcel = () => {
             if(attendanceData.length === 0) return alert("İndirilecek veri yok.");
 
             const className = prompt("Lütfen sınıf veya ders adını giriniz:", "Yoklama");
-            if (!className) return; // İptal edildi
+            if (!className) return;
 
-            // CSV oluştur (BOM ekliyoruz ki Excel Türkçe karakterleri doğru okusun)
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
             csvContent += "Öğrenci Numarası,Ad Soyad,İmza Zamanı\n";
 
             attendanceData.forEach(row => {
-                // CSV injection'ı önlemek için değerleri tırnak içine al
                 csvContent += `"${row.number}","${row.name}","${row.time}"\n`;
             });
 
@@ -390,56 +444,61 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-        }
+        };
 
         // --- ÖĞRENCİ FONKSİYONLARI ---
 
-        function submitAttendance(e) {
+        window.submitAttendance = async (e) => {
             e.preventDefault();
+            if (!currentUser) return alert("Sunucu ile bağlantı kuruluyor, lütfen birkaç saniye bekleyip tekrar deneyin.");
             
             const stdNo = document.getElementById('stdNo').value.trim();
             const stdName = document.getElementById('stdName').value.trim();
-            
-            if(!stdNo || !stdName) return;
+            if(!stdNo || !stdName || !currentSession) return;
 
-            const now = new Date();
-            const timeString = now.getHours().toString().padStart(2, '0') + ':' + 
-                             now.getMinutes().toString().padStart(2, '0');
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> Kaydediliyor...';
+            lucide.createIcons();
 
-            const newRecord = {
-                id: Date.now().toString(),
-                number: stdNo,
-                name: stdName,
-                time: timeString
-            };
+            try {
+                const colRef = getSessionCollection(currentSession);
+                
+                // Mükerrer kayıt kontrolü (Aynı öğrenci numarası ile atılmış imza var mı?)
+                const querySnapshot = await getDocs(colRef);
+                const existingDocs = querySnapshot.docs.map(d => d.data());
+                const exists = existingDocs.some(s => s.number === stdNo);
+                
+                if(exists) {
+                    alert("Bu öğrenci numarası ile zaten imza atılmış!");
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i data-lucide="pen-tool" class="w-5 h-5"></i> İmzala';
+                    lucide.createIcons();
+                    return;
+                }
 
-            // Güncel listeyi alıp ekle (Başka sekmelerden eklenmiş olabilir)
-            let currentData = JSON.parse(localStorage.getItem('yoklama_listesi')) || [];
-            
-            // Aynı numara daha önce girilmiş mi kontrol et (Opsiyonel)
-            const exists = currentData.some(s => s.number === stdNo);
-            if(exists) {
-                alert("Bu öğrenci numarası ile zaten imza atılmış!");
-                return;
+                const now = new Date();
+                const timeString = now.getHours().toString().padStart(2, '0') + ':' + 
+                                 now.getMinutes().toString().padStart(2, '0');
+
+                // Veritabanına Ekle (Firebase Bulutuna)
+                await addDoc(colRef, {
+                    number: stdNo,
+                    name: stdName,
+                    time: timeString,
+                    timestamp: Date.now()
+                });
+
+                document.getElementById('studentForm').classList.add('hidden');
+                document.getElementById('successMessage').classList.remove('hidden');
+            } catch(error) {
+                console.error("Kayıt hatası:", error);
+                alert("Kayıt sırasında bir hata oluştu. Lütfen bağlantınızı kontrol edip tekrar deneyin.");
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i data-lucide="pen-tool" class="w-5 h-5"></i> İmzala';
+                lucide.createIcons();
             }
-
-            currentData.push(newRecord);
-            localStorage.setItem('yoklama_listesi', JSON.stringify(currentData));
-
-            // UI Güncelleme
-            document.getElementById('studentForm').classList.add('hidden');
-            document.getElementById('successMessage').classList.remove('hidden');
-        }
-
-        // --- CANLI SENKRONİZASYON (Sekmeler Arası) ---
-        // Eğer aynı tarayıcıda yeni sekmede öğrenci giriş yaparsa, öğretmen ekranı anında güncellenir.
-        window.addEventListener('storage', function(e) {
-            if(e.key === 'yoklama_listesi' && !isStudentMode) {
-                attendanceData = JSON.parse(e.newValue) || [];
-                renderList();
-            }
-        });
-
+        };
     </script>
 </body>
 </html>
