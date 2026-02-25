@@ -74,7 +74,7 @@
                 </button>
 
                 <div class="mt-8 text-xs text-slate-400">
-                    *Karekod her oluşturulduğunda benzersiz bir oturum açılır.
+                    *Güvenlik: Karekod kopyalanmaya karşı her 10 saniyede bir otomatik yenilenir.
                 </div>
             </div>
         </div>
@@ -91,6 +91,14 @@
                 </button>
             </div>
 
+            <!-- Arama Çubuğu -->
+            <div class="p-4 border-b border-slate-100 bg-slate-50">
+                <div class="relative">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+                    <input type="text" id="searchInput" oninput="handleSearch(this.value)" placeholder="İsim veya Numara Ara..." class="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition">
+                </div>
+            </div>
+
             <div class="flex-1 overflow-y-auto p-4 bg-slate-50">
                 <ul id="attendanceList" class="space-y-3">
                     <!-- Öğrenci listesi buraya dinamik eklenecek -->
@@ -98,7 +106,7 @@
                 
                 <div id="emptyState" class="text-center text-slate-400 mt-20 flex flex-col items-center">
                     <i data-lucide="users" class="w-16 h-16 mb-4 opacity-50"></i>
-                    <p>Henüz kimse imza atmadı.</p>
+                    <p>Liste şu an boş.</p>
                 </div>
             </div>
             
@@ -191,13 +199,32 @@
         const urlParams = new URLSearchParams(window.location.search);
         const isStudentMode = urlParams.get('mode') === 'student';
         let currentSession = urlParams.get('session');
+        const qrTimestamp = urlParams.get('t'); // Karekod oluşturulma zamanı
 
         if (isStudentMode) {
             document.getElementById('teacherView').classList.add('hidden');
             document.getElementById('studentView').classList.remove('hidden');
             document.getElementById('studentView').classList.add('flex');
+            
+            // Güvenlik: Tek Cihaz ve Zaman Kontrolü
             if(!currentSession) {
                 document.getElementById('studentForm').innerHTML = '<div class="text-red-500 text-center font-bold">Geçersiz veya hatalı karekod bağlantısı!</div>';
+            } else if (localStorage.getItem('attended_' + currentSession)) {
+                document.getElementById('studentForm').innerHTML = `
+                    <div class="text-amber-600 text-center font-bold text-lg">
+                        <i data-lucide="alert-triangle" class="w-16 h-16 mx-auto mb-4 opacity-80"></i>
+                        Bu cihazdan zaten imza atılmış!
+                    </div>`;
+                lucide.createIcons();
+            } else if (qrTimestamp && (Date.now() - parseInt(qrTimestamp) > 20000)) {
+                // Karekod oluşturulduktan 20 saniye sonra link geçersiz olur (WhatsApp üzerinden paylaşımı önler)
+                document.getElementById('studentForm').innerHTML = `
+                    <div class="text-red-500 text-center font-bold text-lg">
+                        <i data-lucide="clock" class="w-16 h-16 mx-auto mb-4 opacity-80"></i>
+                        Karekodun süresi dolmuş!
+                        <span class="text-sm font-normal text-slate-500 mt-2 block">Lütfen tahtadaki güncel karekodu okutun.</span>
+                    </div>`;
+                lucide.createIcons();
             }
         } else {
             document.getElementById('teacherView').classList.remove('hidden');
@@ -206,6 +233,14 @@
                 currentSession = localStorage.getItem('active_session');
             }
         }
+
+        // Kazara Çıkışları Önleme
+        window.addEventListener('beforeunload', (e) => {
+            if (isQrActive && !isStudentMode) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
 
         // --- FIREBASE ORTAM KONTROLÜ ---
         const isCanvasEnv = typeof __firebase_config !== 'undefined';
@@ -219,7 +254,6 @@
             activeAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         }
 
-        // Eğer Firebase bilgisi yoksa (GitHub'a atılmış ama config girilmemişse) beyaz ekranı engelle ve uyarı ver
         if (!firebaseConfig) {
             document.getElementById('setupWarning').classList.remove('hidden');
             document.getElementById('setupWarning').classList.add('flex');
@@ -234,25 +268,24 @@
         // Global State
         let currentUser = null;
         let timerInterval;
+        let qrRefreshInterval; // Dinamik karekod için aralık
         let isQrActive = false;
         let qrCodeObj = null;
         let attendanceData = [];
+        let searchTerm = ''; // Arama için
         let unsubscribeSnapshot = null;
         const TIMER_SECONDS = 300; 
 
         // Kimlik Doğrulama
         const initAuth = async () => {
             try {
-                // Eğer kendi veritabanınızı kullanıyorsanız Canvas test tokenını kullanma, anonim giriş yap.
                 if (!MY_FIREBASE_CONFIG && isCanvasEnv && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
-                    await signInAnonymously(auth); // Gerçek GitHub sayfanızda anonim giriş kullanılır
+                    await signInAnonymously(auth);
                 }
             } catch (error) {
                 console.error("Kimlik doğrulama hatası:", error);
-                
-                // Kimlik Doğrulama hatası yakalandığında ekranda gösterilecek şık uyarı:
                 const errorDiv = document.createElement('div');
                 errorDiv.className = "fixed inset-0 bg-slate-900/95 z-[100] flex flex-col items-center justify-center p-6 text-center text-white backdrop-blur-md";
                 errorDiv.innerHTML = `
@@ -286,7 +319,6 @@
         initAuth();
 
         const getSessionCollection = (sessionId) => {
-            // Gerçek projede rules hatası almamak için koleksiyon yolu
             if(MY_FIREBASE_CONFIG) {
                 return collection(db, 'yoklama_oturumları', sessionId, 'ogrenciler');
             } else {
@@ -300,6 +332,7 @@
             if (!currentUser) return alert("Veritabanına bağlanılıyor, lütfen 1-2 saniye bekleyip tekrar deneyin.");
 
             clearInterval(timerInterval);
+            clearInterval(qrRefreshInterval); // Eski yenilemeleri durdur
             document.getElementById('qrcode').innerHTML = '';
             document.getElementById('expiredMessage').classList.add('hidden');
             
@@ -308,14 +341,24 @@
             isQrActive = true;
 
             const baseUrl = window.location.href.split('?')[0];
-            const studentUrl = `${baseUrl}?mode=student&session=${currentSession}`;
 
-            qrCodeObj = new QRCode(document.getElementById("qrcode"), {
-                text: studentUrl,
-                width: 200, height: 200,
-                colorDark : "#312e81", colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.H
-            });
+            // Dinamik Karekod Oluşturucu Fonksiyon
+            function generateDynamicQR() {
+                const timestamp = Date.now();
+                const studentUrl = `${baseUrl}?mode=student&session=${currentSession}&t=${timestamp}`;
+                
+                document.getElementById('qrcode').innerHTML = '';
+                qrCodeObj = new QRCode(document.getElementById("qrcode"), {
+                    text: studentUrl,
+                    width: 200, height: 200,
+                    colorDark : "#312e81", colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.H
+                });
+            }
+
+            generateDynamicQR(); // İlk karekodu oluştur
+            // Her 10 saniyede bir karekodu ve linki yenile (WhatsApp koruması)
+            qrRefreshInterval = setInterval(generateDynamicQR, 10000); 
 
             document.getElementById('qrcode').classList.remove('hidden');
             document.getElementById('timerDisplay').classList.remove('hidden');
@@ -359,6 +402,7 @@
 
         function endQrSession() {
             isQrActive = false;
+            clearInterval(qrRefreshInterval); // Dinamik yenilemeyi durdur
             document.getElementById('qrcode').classList.add('hidden');
             document.getElementById('timerDisplay').classList.add('hidden');
             document.getElementById('expiredMessage').classList.remove('hidden');
@@ -386,6 +430,11 @@
 
         // --- CRUD İŞLEMLERİ (ÖĞRETMEN) ---
 
+        window.handleSearch = (value) => {
+            searchTerm = value.toLowerCase();
+            renderList();
+        };
+
         function renderList() {
             const listEl = document.getElementById('attendanceList');
             const emptyState = document.getElementById('emptyState');
@@ -394,12 +443,21 @@
             listEl.innerHTML = '';
             countEl.textContent = attendanceData.length;
 
-            if (attendanceData.length === 0) {
+            // Arama Filtresi Uygulama
+            let filteredData = attendanceData;
+            if (searchTerm !== '') {
+                filteredData = attendanceData.filter(s => 
+                    s.name.toLowerCase().includes(searchTerm) || 
+                    s.number.includes(searchTerm)
+                );
+            }
+
+            if (filteredData.length === 0) {
                 emptyState.classList.remove('hidden');
             } else {
                 emptyState.classList.add('hidden');
                 
-                attendanceData.forEach(student => {
+                filteredData.forEach(student => {
                     const li = document.createElement('li');
                     li.className = "bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center group transition-all hover:shadow-md";
                     
@@ -498,7 +556,10 @@
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
             csvContent += "Öğrenci Numarası,Ad Soyad,İmza Zamanı\n";
 
-            attendanceData.forEach(row => {
+            // Excel'e yansıtırken alfabetik sıraya göre düzenle (Kullanım Kolaylığı)
+            const sortedData = [...attendanceData].sort((a, b) => a.name.localeCompare(b.name));
+
+            sortedData.forEach(row => {
                 csvContent += `"${row.number}","${row.name}","${row.time}"\n`;
             });
 
@@ -551,6 +612,9 @@
                     time: timeString,
                     timestamp: Date.now()
                 });
+
+                // Başarılı imza sonrası cihazı hafızaya kaydet
+                localStorage.setItem('attended_' + currentSession, 'true');
 
                 document.getElementById('studentForm').classList.add('hidden');
                 document.getElementById('successMessage').classList.remove('hidden');
