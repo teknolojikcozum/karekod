@@ -1,1 +1,445 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Akıllı Yoklama Sistemi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        #qrcode img { margin: 0 auto; border-radius: 8px; }
+        
+        /* Özel Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800">
 
+    <!-- ÖĞRETMEN EKRANI -->
+    <div id="teacherView" class="hidden flex-col md:flex-row h-screen w-full">
+        
+        <!-- Sol/Orta Alan: Karekod ve Kontroller -->
+        <div class="flex-1 flex flex-col p-6 items-center justify-center relative bg-gradient-to-br from-indigo-50 to-slate-100">
+            
+            <div class="absolute top-6 left-6 flex items-center gap-2 text-indigo-700 font-bold text-xl">
+                <i data-lucide="graduation-cap" class="w-8 h-8"></i>
+                <span>YoklamaSistemi</span>
+            </div>
+
+            <div class="glass-panel p-10 rounded-3xl flex flex-col items-center w-full max-w-md text-center transition-all duration-300">
+                
+                <h2 class="text-2xl font-bold text-slate-700 mb-2">Yoklama Oturumu</h2>
+                <p class="text-slate-500 mb-8 text-sm">Öğrencilerin okutması için karekodu başlatın.</p>
+
+                <!-- Zamanlayıcı -->
+                <div id="timerDisplay" class="text-5xl font-mono font-bold text-indigo-600 mb-6 hidden">05:00</div>
+
+                <!-- Karekod Alanı -->
+                <div id="qrcode" class="mb-6 p-4 bg-white rounded-xl shadow-inner hidden min-h-[200px] flex items-center justify-center"></div>
+                <div id="expiredMessage" class="hidden text-red-500 font-bold mb-6 text-lg">Süre Doldu! Karekod artık geçersiz.</div>
+
+                <button id="startQrBtn" onclick="startQrSession()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-8 rounded-full shadow-lg transition-all transform hover:scale-105 flex items-center gap-2">
+                    <i data-lucide="qr-code"></i>
+                    Karekodu Göster
+                </button>
+
+                <div class="mt-8 text-xs text-slate-400">
+                    *Karekod her oluşturulduğunda benzersiz bir oturum açılır.
+                </div>
+            </div>
+        </div>
+
+        <!-- Sağ Alan: Öğrenci Listesi -->
+        <div class="w-full md:w-[400px] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.05)] flex flex-col h-screen border-l border-slate-200">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-white z-10">
+                <div>
+                    <h3 class="font-bold text-lg text-slate-800">Yoklama Listesi</h3>
+                    <p class="text-sm text-slate-500"><span id="studentCount">0</span> Öğrenci Katıldı</p>
+                </div>
+                <button onclick="downloadExcel()" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 p-2 rounded-lg transition-colors" title="Excel Olarak İndir">
+                    <i data-lucide="download"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 bg-slate-50">
+                <ul id="attendanceList" class="space-y-3">
+                    <!-- Öğrenci listesi buraya dinamik eklenecek -->
+                </ul>
+                
+                <div id="emptyState" class="text-center text-slate-400 mt-20 flex flex-col items-center">
+                    <i data-lucide="users" class="w-16 h-16 mb-4 opacity-50"></i>
+                    <p>Henüz kimse imza atmadı.</p>
+                </div>
+            </div>
+            
+            <!-- Listeyi Temizle Butonu (Geliştirici/Test için) -->
+            <div class="p-4 border-t border-slate-100 bg-white">
+                <button onclick="clearList()" class="w-full py-2 text-sm text-red-500 hover:bg-red-50 rounded-lg transition">Listeyi Sıfırla</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ÖĞRENCİ EKRANI -->
+    <div id="studentView" class="hidden min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border-t-4 border-indigo-600">
+            <div class="text-center mb-8">
+                <i data-lucide="check-circle" class="w-12 h-12 text-indigo-600 mx-auto mb-3"></i>
+                <h2 class="text-2xl font-bold text-slate-800">Yoklama Formu</h2>
+                <p class="text-slate-500 text-sm mt-1">Lütfen bilgilerinizi eksiksiz doldurun.</p>
+            </div>
+
+            <form id="studentForm" onsubmit="submitAttendance(event)">
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Öğrenci Numarası</label>
+                        <input type="number" id="stdNo" required class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition" placeholder="Örn: 20230101">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Ad Soyad</label>
+                        <input type="text" id="stdName" required class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition" placeholder="Örn: Ahmet Yılmaz">
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 mt-4 flex justify-center items-center gap-2">
+                        <i data-lucide="pen-tool" class="w-5 h-5"></i>
+                        İmzala
+                    </button>
+                </div>
+            </form>
+
+            <div id="successMessage" class="hidden text-center mt-6 p-4 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200">
+                <i data-lucide="badge-check" class="w-8 h-8 mx-auto mb-2"></i>
+                <p class="font-semibold">Yoklamanız başarıyla alındı!</p>
+                <p class="text-sm mt-1">Bu sekmeyi kapatabilirsiniz.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Düzenleme Modalı (Öğretmen İçin) -->
+    <div id="editModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 class="font-bold text-lg mb-4 text-slate-800">Kaydı Düzenle</h3>
+            <input type="hidden" id="editId">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-slate-600 mb-1">Öğrenci Numarası</label>
+                    <input type="number" id="editStdNo" class="w-full p-2 border rounded focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-600 mb-1">Ad Soyad</label>
+                    <input type="text" id="editStdName" class="w-full p-2 border rounded focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end gap-3">
+                <button onclick="closeEditModal()" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">İptal</button>
+                <button onclick="saveEdit()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // İkonları başlat
+        lucide.createIcons();
+
+        // Uygulama Durumu (State)
+        let timerInterval;
+        let isQrActive = false;
+        let qrCodeObj = null;
+        let attendanceData = JSON.parse(localStorage.getItem('yoklama_listesi')) || [];
+        const TIMER_SECONDS = 300; // 5 dakika
+
+        // URL Analizi (Hangi ekrandayız?)
+        const urlParams = new URLSearchParams(window.location.search);
+        const isStudentMode = urlParams.get('mode') === 'student';
+        const currentSession = urlParams.get('session');
+
+        if (isStudentMode) {
+            document.getElementById('teacherView').classList.add('hidden');
+            document.getElementById('studentView').classList.remove('hidden');
+            document.getElementById('studentView').classList.add('flex');
+            
+            // Eğer aktif bir oturum yoksa veya süre dolduysa form açılmasın (Basit güvenlik)
+            const activeSession = localStorage.getItem('active_session');
+            if(currentSession !== activeSession) {
+                document.getElementById('studentForm').innerHTML = '<div class="text-red-500 text-center font-bold">Geçersiz veya süresi dolmuş karekod!</div>';
+            }
+        } else {
+            document.getElementById('teacherView').classList.remove('hidden');
+            document.getElementById('teacherView').classList.add('flex');
+            renderList();
+        }
+
+        // --- ÖĞRETMEN FONKSİYONLARI ---
+
+        function startQrSession() {
+            // Önceki durumu temizle
+            clearInterval(timerInterval);
+            document.getElementById('qrcode').innerHTML = '';
+            document.getElementById('expiredMessage').classList.add('hidden');
+            
+            // Yeni benzersiz oturum kimliği oluştur
+            const sessionId = Math.random().toString(36).substring(2, 15);
+            localStorage.setItem('active_session', sessionId);
+            isQrActive = true;
+
+            // Öğrencinin gideceği link (Bulunduğumuz sayfa URL'sine parametre ekleyerek)
+            // Not: Gerçek hayatta burası sunucudaki bir URL olur.
+            const baseUrl = window.location.href.split('?')[0];
+            const studentUrl = `${baseUrl}?mode=student&session=${sessionId}`;
+
+            // Karekodu oluştur
+            qrCodeObj = new QRCode(document.getElementById("qrcode"), {
+                text: studentUrl,
+                width: 200,
+                height: 200,
+                colorDark : "#312e81", // indigo-900
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+
+            // UI Güncellemeleri
+            document.getElementById('qrcode').classList.remove('hidden');
+            document.getElementById('timerDisplay').classList.remove('hidden');
+            document.getElementById('startQrBtn').innerHTML = '<i data-lucide="refresh-cw"></i> Karekodu Yenile';
+            lucide.createIcons();
+
+            startTimer(TIMER_SECONDS);
+        }
+
+        function startTimer(duration) {
+            let timer = duration;
+            const display = document.getElementById('timerDisplay');
+            
+            // İlk anı hemen göster
+            updateTimerUI(timer, display);
+
+            timerInterval = setInterval(function () {
+                timer--;
+                updateTimerUI(timer, display);
+
+                if (timer <= 0) {
+                    clearInterval(timerInterval);
+                    endQrSession();
+                }
+            }, 1000);
+        }
+
+        function updateTimerUI(secondsLeft, displayElement) {
+            let minutes = parseInt(secondsLeft / 60, 10);
+            let seconds = parseInt(secondsLeft % 60, 10);
+
+            minutes = minutes < 10 ? "0" + minutes : minutes;
+            seconds = seconds < 10 ? "0" + seconds : seconds;
+
+            displayElement.textContent = minutes + ":" + seconds;
+
+            // Son 30 saniye kırmızı uyarı
+            if(secondsLeft <= 30) {
+                displayElement.classList.remove('text-indigo-600');
+                displayElement.classList.add('text-red-500', 'animate-pulse');
+            } else {
+                displayElement.classList.add('text-indigo-600');
+                displayElement.classList.remove('text-red-500', 'animate-pulse');
+            }
+        }
+
+        function endQrSession() {
+            isQrActive = false;
+            localStorage.removeItem('active_session');
+            document.getElementById('qrcode').classList.add('hidden');
+            document.getElementById('timerDisplay').classList.add('hidden');
+            document.getElementById('expiredMessage').classList.remove('hidden');
+            document.getElementById('startQrBtn').innerHTML = '<i data-lucide="qr-code"></i> Yeni Karekod Oluştur';
+            lucide.createIcons();
+        }
+
+        // --- CRUD İŞLEMLERİ (ÖĞRETMEN) ---
+
+        function renderList() {
+            const listEl = document.getElementById('attendanceList');
+            const emptyState = document.getElementById('emptyState');
+            const countEl = document.getElementById('studentCount');
+            
+            listEl.innerHTML = '';
+            countEl.textContent = attendanceData.length;
+
+            if (attendanceData.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                
+                // Tersten sırala (En son eklenen en üstte)
+                const sortedData = [...attendanceData].reverse();
+
+                sortedData.forEach(student => {
+                    const li = document.createElement('li');
+                    li.className = "bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center group transition-all hover:shadow-md";
+                    
+                    li.innerHTML = `
+                        <div class="flex items-center gap-3 overflow-hidden">
+                            <div class="bg-indigo-100 text-indigo-700 w-10 h-10 rounded-full flex items-center justify-center font-bold flex-shrink-0">
+                                ${student.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div class="truncate">
+                                <p class="font-bold text-slate-800 truncate" title="${student.name}">${student.name}</p>
+                                <div class="flex items-center gap-2 text-xs text-slate-500">
+                                    <span class="font-mono bg-slate-100 px-1.5 py-0.5 rounded">${student.number}</span>
+                                    <span>•</span>
+                                    <span>${student.time}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                            <button onclick="openEditModal('${student.id}')" class="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="Düzenle">
+                                <i data-lucide="edit-2" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="deleteStudent('${student.id}')" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition" title="Sil">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    `;
+                    listEl.appendChild(li);
+                });
+                lucide.createIcons();
+            }
+        }
+
+        function deleteStudent(id) {
+            if(confirm("Bu öğrenciyi yoklama listesinden silmek istediğinize emin misiniz?")) {
+                attendanceData = attendanceData.filter(s => s.id !== id);
+                saveDataLocally();
+                renderList();
+            }
+        }
+
+        function openEditModal(id) {
+            const student = attendanceData.find(s => s.id === id);
+            if(student) {
+                document.getElementById('editId').value = student.id;
+                document.getElementById('editStdNo').value = student.number;
+                document.getElementById('editStdName').value = student.name;
+                document.getElementById('editModal').classList.remove('hidden');
+            }
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        function saveEdit() {
+            const id = document.getElementById('editId').value;
+            const newNo = document.getElementById('editStdNo').value.trim();
+            const newName = document.getElementById('editStdName').value.trim();
+
+            if(!newNo || !newName) return alert("Lütfen boş alan bırakmayın.");
+
+            const index = attendanceData.findIndex(s => s.id === id);
+            if(index !== -1) {
+                attendanceData[index].number = newNo;
+                attendanceData[index].name = newName;
+                saveDataLocally();
+                renderList();
+                closeEditModal();
+            }
+        }
+
+        function clearList() {
+            if(confirm("Tüm listeyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) {
+                attendanceData = [];
+                saveDataLocally();
+                renderList();
+            }
+        }
+
+        function saveDataLocally() {
+            localStorage.setItem('yoklama_listesi', JSON.stringify(attendanceData));
+        }
+
+        // --- EXCEL/CSV İNDİRME ---
+
+        function downloadExcel() {
+            if(attendanceData.length === 0) return alert("İndirilecek veri yok.");
+
+            const className = prompt("Lütfen sınıf veya ders adını giriniz:", "Yoklama");
+            if (!className) return; // İptal edildi
+
+            // CSV oluştur (BOM ekliyoruz ki Excel Türkçe karakterleri doğru okusun)
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            csvContent += "Öğrenci Numarası,Ad Soyad,İmza Zamanı\n";
+
+            attendanceData.forEach(row => {
+                // CSV injection'ı önlemek için değerleri tırnak içine al
+                csvContent += `"${row.number}","${row.name}","${row.time}"\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `${className}_Yoklama_Listesi.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // --- ÖĞRENCİ FONKSİYONLARI ---
+
+        function submitAttendance(e) {
+            e.preventDefault();
+            
+            const stdNo = document.getElementById('stdNo').value.trim();
+            const stdName = document.getElementById('stdName').value.trim();
+            
+            if(!stdNo || !stdName) return;
+
+            const now = new Date();
+            const timeString = now.getHours().toString().padStart(2, '0') + ':' + 
+                             now.getMinutes().toString().padStart(2, '0');
+
+            const newRecord = {
+                id: Date.now().toString(),
+                number: stdNo,
+                name: stdName,
+                time: timeString
+            };
+
+            // Güncel listeyi alıp ekle (Başka sekmelerden eklenmiş olabilir)
+            let currentData = JSON.parse(localStorage.getItem('yoklama_listesi')) || [];
+            
+            // Aynı numara daha önce girilmiş mi kontrol et (Opsiyonel)
+            const exists = currentData.some(s => s.number === stdNo);
+            if(exists) {
+                alert("Bu öğrenci numarası ile zaten imza atılmış!");
+                return;
+            }
+
+            currentData.push(newRecord);
+            localStorage.setItem('yoklama_listesi', JSON.stringify(currentData));
+
+            // UI Güncelleme
+            document.getElementById('studentForm').classList.add('hidden');
+            document.getElementById('successMessage').classList.remove('hidden');
+        }
+
+        // --- CANLI SENKRONİZASYON (Sekmeler Arası) ---
+        // Eğer aynı tarayıcıda yeni sekmede öğrenci giriş yaparsa, öğretmen ekranı anında güncellenir.
+        window.addEventListener('storage', function(e) {
+            if(e.key === 'yoklama_listesi' && !isStudentMode) {
+                attendanceData = JSON.parse(e.newValue) || [];
+                renderList();
+            }
+        });
+
+    </script>
+</body>
+</html>
