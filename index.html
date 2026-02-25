@@ -148,9 +148,15 @@
                     <p class="text-sm text-slate-500"><span id="studentCount">0</span> Öğrenci Katıldı</p>
                 </div>
                 <div class="flex gap-2">
+                    <!-- Devamsızları Bul Butonu -->
+                    <button onclick="openAbsenteeModal()" class="bg-amber-100 hover:bg-amber-200 text-amber-700 p-2 rounded-lg transition-colors" title="Devamsızları Bul">
+                        <i data-lucide="user-minus"></i>
+                    </button>
+                    <!-- Manuel Ekle Butonu -->
                     <button onclick="openManualAddModal()" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 p-2 rounded-lg transition-colors" title="Manuel Öğrenci Ekle">
                         <i data-lucide="user-plus"></i>
                     </button>
+                    <!-- Excel İndir Butonu -->
                     <button onclick="downloadExcel()" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 p-2 rounded-lg transition-colors" title="Excel Olarak İndir">
                         <i data-lucide="download"></i>
                     </button>
@@ -220,6 +226,45 @@
             
             <div id="errorMessage" class="hidden text-center mt-6 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
                 <p class="font-semibold text-sm" id="errorText">Bir hata oluştu.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Devamsızlık Bulma Modalı -->
+    <div id="absenteeModal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl relative flex flex-col max-h-[90vh]">
+            <button onclick="closeAbsenteeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i data-lucide="x"></i></button>
+            <h3 class="font-bold text-xl mb-1 text-slate-800 flex items-center gap-2">
+                <i data-lucide="user-minus" class="text-amber-500"></i> Devamsızları Bul
+            </h3>
+            <p class="text-xs text-slate-500 mb-4">Tam sınıf listesini aşağıya yapıştırın. Sistem imza atmayanları otomatik bulur.</p>
+            
+            <div class="flex-1 overflow-y-auto mb-4 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Tam Sınıf Listesi (Önce No, Sonra İsim)</label>
+                    <textarea id="fullClassListInput" rows="5" class="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none text-xs font-mono bg-slate-50" placeholder="Örn:&#10;202301 Ali Yılmaz&#10;202302 Ayşe Demir&#10;(Excel'den sütunları seçip kopyalayarak direkt buraya yapıştırabilirsiniz)"></textarea>
+                </div>
+                
+                <button onclick="calculateAbsentees()" class="w-full py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 font-semibold shadow-md transition">
+                    Karşılaştır ve Bul
+                </button>
+
+                <div id="absenteeResultArea" class="hidden border border-slate-200 rounded-xl overflow-hidden mt-4">
+                    <div class="bg-slate-100 p-3 border-b border-slate-200 flex justify-between items-center">
+                        <span class="font-bold text-slate-700 text-sm">Sonuçlar</span>
+                        <span id="absenteeCountText" class="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded">0 Yok</span>
+                    </div>
+                    <ul id="absenteeList" class="max-h-48 overflow-y-auto bg-white p-2">
+                        <!-- Devamsızlar buraya gelecek -->
+                    </ul>
+                </div>
+            </div>
+
+            <div class="mt-2 pt-4 border-t border-slate-100 flex justify-end gap-3">
+                <button onclick="closeAbsenteeModal()" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-sm font-medium transition">Kapat</button>
+                <button id="downloadAbsenteesBtn" onclick="downloadAbsenteesExcel()" class="hidden px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 text-sm font-medium shadow-md transition flex items-center gap-2">
+                    <i data-lucide="download" class="w-4 h-4"></i> Excel'e İndir
+                </button>
             </div>
         </div>
     </div>
@@ -309,7 +354,7 @@
         const isStudentMode = urlParams.get('mode') === 'student';
         let currentSession = urlParams.get('session');
         const qrTimestamp = urlParams.get('t'); 
-        const urlClassName = urlParams.get('c'); // Öğrenci linkinden gelen ders adı
+        const urlClassName = urlParams.get('c'); 
 
         let timerInterval;
         let qrRefreshInterval;
@@ -317,6 +362,7 @@
         let isQrActive = false;
         let qrCodeObj = null;
         let attendanceData = [];
+        let absenteeData = []; // Devamsızlar listesi
         let searchTerm = ''; 
         let previousAttendanceCount = 0; 
         
@@ -333,7 +379,6 @@
             document.getElementById('studentView').classList.remove('hidden');
             document.getElementById('studentView').classList.add('flex');
             
-            // UX: Ders adı geldiyse formu kişiselleştir
             if (urlClassName) {
                 document.getElementById('studentFormTitle').textContent = decodeURIComponent(urlClassName) + " Yoklaması";
             }
@@ -370,7 +415,6 @@
                 currentClassName = localStorage.getItem('active_class_name') || '';
                 currentTargetCount = parseInt(localStorage.getItem('active_target_count')) || 0;
 
-                // Eğer aktif bir oturum varsa arayüzü ders görünümüne ayarla
                 if (currentClassName) {
                     document.getElementById('setupContainer').classList.add('hidden');
                     document.getElementById('activeSessionInfo').classList.remove('hidden');
@@ -468,7 +512,7 @@
             
             localStorage.setItem('yoklama_sheet_id', sheetId);
             closeSettings();
-            alert("Bağlantı başarıyla kaydedildi! Lütfen tablonun paylaşım ayarının 'Bağlantıya sahip olan herkes düzenleyebilir' olduğundan emin olun.");
+            alert("Bağlantı başarıyla kaydedildi!");
             if(currentSession) startPolling(currentSession); 
         }
 
@@ -537,7 +581,6 @@
         window.startQrSession = () => {
             if (!getSheetId()) return alert("Lütfen önce sağ üstteki ayarlar butonundan Google Excel linkinizi yapıştırın.");
 
-            // Eğer kurulum ekranı görünüyorsa bilgileri al
             if (!document.getElementById('setupContainer').classList.contains('hidden')) {
                 currentClassName = document.getElementById('classNameInput').value.trim();
                 currentTargetCount = parseInt(document.getElementById('targetCountInput').value.trim()) || 0;
@@ -598,7 +641,7 @@
 
             startTimer(currentTimerSeconds);
             startPolling(currentSession);
-            updateProgress(); // Progresi hemen güncelle
+            updateProgress(); 
         };
 
         function startTimer(duration) {
@@ -647,7 +690,6 @@
             }
         }
 
-        // Yeni Derse Geçiş Yapma (Resetleme)
         window.resetSessionUI = () => {
             if(confirm("Mevcut ders oturumunu kapatıp tamamen yeni bir derse geçmek istediğinize emin misiniz?")) {
                 endQrSession(); 
@@ -656,7 +698,6 @@
                 attendanceData = [];
                 renderList();
                 
-                // Hafızayı temizle
                 localStorage.removeItem('active_session');
                 localStorage.removeItem('active_class_name');
                 localStorage.removeItem('active_target_count');
@@ -664,7 +705,6 @@
                 currentClassName = '';
                 currentTargetCount = 0;
                 
-                // UI'ı başa al
                 document.getElementById('setupContainer').classList.remove('hidden');
                 document.getElementById('activeSessionInfo').classList.add('hidden');
                 document.getElementById('newLessonBtn').classList.add('hidden');
@@ -692,7 +732,7 @@
             listEl.innerHTML = '';
             countEl.textContent = attendanceData.length;
             
-            updateProgress(); // Liste değiştikçe barı güncelle
+            updateProgress(); 
 
             let filteredData = attendanceData;
             if (searchTerm !== '') {
@@ -822,7 +862,6 @@
                 timestamp: Date.now()
             };
 
-            // Önce arayüze ekle (Hızlı tepki)
             attendanceData.unshift(studentData);
             previousAttendanceCount = attendanceData.length;
             renderList();
@@ -831,7 +870,7 @@
                 const result = await fetchFromGAS('add', { session: currentSession, student: studentData });
                 if(result.isDuplicate) {
                     alert("Bu numaraya ait bir kayıt zaten var!");
-                    syncData(currentSession); // Eski listeyi geri çağır
+                    syncData(currentSession); 
                 }
             } catch(error) {
                 alert("Öğrenci eklenirken bir hata oluştu.");
@@ -839,6 +878,89 @@
             }
         };
 
+        // --- DEVAMSIZLARI BULMA MANTIĞI ---
+        window.openAbsenteeModal = () => {
+            document.getElementById('absenteeModal').classList.remove('hidden');
+            document.getElementById('absenteeResultArea').classList.add('hidden');
+            document.getElementById('downloadAbsenteesBtn').classList.add('hidden');
+            
+            // Önceden yapıştırılan listeyi hatırla
+            if(localStorage.getItem('saved_full_class_list')) {
+                document.getElementById('fullClassListInput').value = localStorage.getItem('saved_full_class_list');
+            }
+        };
+
+        window.closeAbsenteeModal = () => {
+            document.getElementById('absenteeModal').classList.add('hidden');
+        };
+
+        window.calculateAbsentees = () => {
+            const rawData = document.getElementById('fullClassListInput').value.trim();
+            if(!rawData) return alert("Lütfen karşılaştırma için tam sınıf listesini yapıştırın.");
+
+            localStorage.setItem('saved_full_class_list', rawData);
+
+            const lines = rawData.split('\n');
+            const fullList = [];
+
+            // Satır satır okuma ve parse etme
+            lines.forEach(line => {
+                if(!line.trim()) return;
+                // Excel'den kopyalanan veri genellikle Tab (\t) ile ayrılır. Ayrıca virgül de desteklenir.
+                const parts = line.split(/\t|,/);
+                const num = parts[0].trim();
+                const name = parts.length > 1 ? parts[1].trim() : "İsimsiz";
+                if(num) {
+                    fullList.push({ number: num, name: name });
+                }
+            });
+
+            // Gelenleri ve gelmeyenleri filtrele
+            const attendedNumbers = attendanceData.map(s => s.number.toString().trim());
+            absenteeData = fullList.filter(s => !attendedNumbers.includes(s.number.toString().trim()));
+
+            // Ekrana Çizme
+            const resultListEl = document.getElementById('absenteeList');
+            resultListEl.innerHTML = '';
+
+            if(absenteeData.length === 0) {
+                resultListEl.innerHTML = '<li class="text-emerald-600 p-3 text-sm font-semibold flex items-center gap-2"><i data-lucide="check-circle" class="w-4 h-4"></i> Harika! Sınıftaki herkes gelmiş.</li>';
+                document.getElementById('downloadAbsenteesBtn').classList.add('hidden');
+            } else {
+                absenteeData.forEach(abs => {
+                    resultListEl.innerHTML += `
+                    <li class="p-2 border-b border-slate-100 flex justify-between items-center text-sm group hover:bg-slate-50">
+                        <span class="font-mono text-slate-500 text-xs">${abs.number}</span>
+                        <span class="font-semibold text-slate-700">${abs.name}</span>
+                    </li>`;
+                });
+                document.getElementById('downloadAbsenteesBtn').classList.remove('hidden');
+            }
+
+            document.getElementById('absenteeCountText').innerText = absenteeData.length + " Öğrenci Yok";
+            document.getElementById('absenteeResultArea').classList.remove('hidden');
+            lucide.createIcons();
+        };
+
+        window.downloadAbsenteesExcel = () => {
+            if(absenteeData.length === 0) return alert("İndirilecek devamsız listesi yok.");
+
+            const className = currentClassName || "Yoklama";
+
+            const excelData = absenteeData.map(row => ({
+                "Öğrenci Numarası": row.number,
+                "Ad Soyad": row.name,
+                "Durum": "Devamsız"
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Devamsızlar");
+
+            XLSX.writeFile(workbook, `${className}_Devamsiz_Listesi.xlsx`);
+        };
+
+        // --- GENEL İŞLEMLER ---
         window.clearList = async () => {
             if(attendanceData.length === 0) return;
             if(confirm("Mevcut listedeki TÜM kayıtları Excel tablosundan kalıcı olarak silmek istediğinize emin misiniz?")) {
@@ -856,25 +978,21 @@
 
         window.logout = () => {
             if(confirm("Excel bağlantısını kesip çıkış yapmak istediğinize emin misiniz? Devam eden bir yoklama oturumunuz varsa sonlandırılacaktır.")) {
-                // Oturumu ve dinlemeyi durdur
                 if(isQrActive) endQrSession();
                 clearInterval(pollingInterval);
                 
-                // Verileri sıfırla
                 currentSession = null;
                 attendanceData = [];
                 currentClassName = '';
                 currentTargetCount = 0;
                 renderList();
                 
-                // Cihaz hafızasındaki bağlantıları tamamen temizle
                 localStorage.removeItem('yoklama_sheet_id');
                 localStorage.removeItem('active_session');
                 localStorage.removeItem('active_class_name');
                 localStorage.removeItem('active_target_count');
                 localStorage.removeItem('active_timer_val');
                 
-                // Arayüzü başlangıç haline getir
                 document.getElementById('setupContainer').classList.remove('hidden');
                 document.getElementById('activeSessionInfo').classList.add('hidden');
                 document.getElementById('newLessonBtn').classList.add('hidden');
@@ -885,7 +1003,6 @@
                 document.getElementById('expiredMessage').classList.add('hidden');
                 document.getElementById('syncIndicator').classList.add('hidden');
                 
-                // Ayarlar (Bağlantı) ekranını boş olarak aç
             document.getElementById('sheetUrlInput').value = '';
             openSettings();
             lucide.createIcons();
@@ -895,7 +1012,6 @@
     window.downloadExcel = () => {
         if(attendanceData.length === 0) return alert("İndirilecek veri yok.");
 
-        // Ön tanımlı olarak girilen ders adını dosya adına öner
         const className = prompt("Lütfen indirilecek dosya adını giriniz:", currentClassName || "Yoklama");
         if (!className) return;
 
