@@ -26,6 +26,25 @@
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800">
 
+    <!-- VERİTABANI BAĞLANTI UYARISI (GitHub Pages İçin) -->
+    <div id="setupWarning" class="hidden fixed inset-0 bg-slate-900/95 z-[100] flex-col items-center justify-center p-6 text-center text-white backdrop-blur-md">
+        <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 max-w-lg shadow-2xl">
+            <i data-lucide="cloud-off" class="w-20 h-20 text-red-400 mx-auto mb-6"></i>
+            <h2 class="text-3xl font-bold mb-4">Bulut Bağlantısı Koptu</h2>
+            <p class="text-slate-300 mb-6 leading-relaxed">
+                Bu uygulamayı <b>GitHub Pages</b> üzerinde farklı cihazlardan canlı (öğrencilerin telefonundan anlık) kullanabilmeniz için kod içerisine kendi <b>Firebase Veritabanı</b> ayarlarınızı girmeniz gerekmektedir.
+            </p>
+            <div class="bg-slate-900 p-4 rounded-xl text-sm text-left text-slate-400 mb-6 font-mono border border-slate-700">
+                1. Firebase'den ücretsiz proje oluşturun.<br>
+                2. Veritabanı (Firestore) config kodlarını alın.<br>
+                3. index.html içindeki <b>MY_FIREBASE_CONFIG</b> alanına yapıştırın.
+            </div>
+            <p class="text-sm text-indigo-300 font-semibold">
+                Lütfen AI asistana "Kendi veritabanımı nasıl kurarım?" diye sorun.
+            </p>
+        </div>
+    </div>
+
     <!-- ÖĞRETMEN EKRANI -->
     <div id="teacherView" class="hidden flex-col md:flex-row h-screen w-full">
         
@@ -89,7 +108,6 @@
             </div>
         </div>
     </div>
-
 
     <!-- ÖĞRENCİ EKRANI -->
     <div id="studentView" class="hidden min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -156,55 +174,83 @@
         // İkonları başlat
         lucide.createIcons();
 
-        // Firebase Yapılandırması ve Başlatma
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : '{"projectId":"mock-project"}';
-        const firebaseConfig = JSON.parse(firebaseConfigStr);
+        // =========================================================================
+        // AŞAĞIDAKİ MY_FIREBASE_CONFIG ALANINA KENDİ BİLGİLERİNİZİ GİRMELİSİNİZ
+        // =========================================================================
+        const MY_FIREBASE_CONFIG = null; 
         
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+       const firebaseConfig = {
+          apiKey: "AIzaSyCWKdjSkPvWjFBezitGd6TIDdm0lljwLL8",
+          authDomain: "yoklama-sistemi-c516e.firebaseapp.com",
+          projectId: "yoklama-sistemi-c516e",
+          storageBucket: "yoklama-sistemi-c516e.firebasestorage.app",
+          messagingSenderId: "399244084443",
+          appId: "1:399244084443:web:cb39935b25d75ec76878fe",
+          measurementId: "G-MERDNRTQ6M"
+        };
+        
+        // =========================================================================
 
-        // Global State (Uygulama Durumu)
-        let currentUser = null;
-        let timerInterval;
-        let isQrActive = false;
-        let qrCodeObj = null;
-        let attendanceData = [];
-        let unsubscribeSnapshot = null;
-        const TIMER_SECONDS = 300; // 5 dakika
-
-        // URL Analizi
+        // --- BEYAZ EKRAN HATASINI ÖNLEMEK İÇİN UI YÜKLEMESİ ---
         const urlParams = new URLSearchParams(window.location.search);
         const isStudentMode = urlParams.get('mode') === 'student';
         let currentSession = urlParams.get('session');
 
-        // UI Başlangıç Ayarları
         if (isStudentMode) {
             document.getElementById('teacherView').classList.add('hidden');
             document.getElementById('studentView').classList.remove('hidden');
             document.getElementById('studentView').classList.add('flex');
-            
             if(!currentSession) {
                 document.getElementById('studentForm').innerHTML = '<div class="text-red-500 text-center font-bold">Geçersiz veya hatalı karekod bağlantısı!</div>';
             }
         } else {
             document.getElementById('teacherView').classList.remove('hidden');
             document.getElementById('teacherView').classList.add('flex');
-            // Eğer öğretmense ve yarım kalan bir oturum varsa geri yükle
             if(!currentSession && localStorage.getItem('active_session')) {
                 currentSession = localStorage.getItem('active_session');
             }
-            renderList();
         }
 
-        // Kimlik Doğrulama İşlemleri (Bulut veritabanına erişim izni için)
+        // --- FIREBASE ORTAM KONTROLÜ ---
+        const isCanvasEnv = typeof __firebase_config !== 'undefined';
+        let firebaseConfig = null;
+        let activeAppId = 'github-sistemi';
+
+        if (MY_FIREBASE_CONFIG) {
+            firebaseConfig = MY_FIREBASE_CONFIG; // GitHub'daki gerçek veritabanınız
+        } else if (isCanvasEnv) {
+            firebaseConfig = JSON.parse(__firebase_config); // Sadece test ortamı
+            activeAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        }
+
+        // Eğer Firebase bilgisi yoksa (GitHub'a atılmış ama config girilmemişse) beyaz ekranı engelle ve uyarı ver
+        if (!firebaseConfig) {
+            document.getElementById('setupWarning').classList.remove('hidden');
+            document.getElementById('setupWarning').classList.add('flex');
+            throw new Error("Sistem Durduruldu: Firebase veritabanı ayarları eksik. Lütfen koda kendi veritabanı ayarlarınızı ekleyin.");
+        }
+
+        // Firebase Yapılandırması Başlatma
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Global State
+        let currentUser = null;
+        let timerInterval;
+        let isQrActive = false;
+        let qrCodeObj = null;
+        let attendanceData = [];
+        let unsubscribeSnapshot = null;
+        const TIMER_SECONDS = 300; 
+
+        // Kimlik Doğrulama
         const initAuth = async () => {
             try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                if (isCanvasEnv && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
-                    await signInAnonymously(auth);
+                    await signInAnonymously(auth); // Gerçek GitHub sayfanızda anonim giriş kullanılır
                 }
             } catch (error) {
                 console.error("Kimlik doğrulama hatası:", error);
@@ -213,7 +259,6 @@
 
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
-            // Öğretmen oturum açtığında ve aktif bir oturum varsa veritabanını dinlemeye başla
             if (user && !isStudentMode && currentSession) {
                 listenToSession(currentSession);
             }
@@ -221,9 +266,13 @@
 
         initAuth();
 
-        // Ortak Collection Referansı Üretici
         const getSessionCollection = (sessionId) => {
-            return collection(db, 'artifacts', appId, 'public', 'data', 'yoklama_' + sessionId);
+            // Gerçek projede rules hatası almamak için koleksiyon yolu
+            if(MY_FIREBASE_CONFIG) {
+                return collection(db, 'yoklama_oturumları', sessionId, 'ogrenciler');
+            } else {
+                return collection(db, 'artifacts', activeAppId, 'public', 'data', 'yoklama_' + sessionId);
+            }
         };
 
         // --- ÖĞRETMEN FONKSİYONLARI ---
@@ -235,7 +284,6 @@
             document.getElementById('qrcode').innerHTML = '';
             document.getElementById('expiredMessage').classList.add('hidden');
             
-            // Yeni oturum kimliği
             currentSession = Math.random().toString(36).substring(2, 15);
             localStorage.setItem('active_session', currentSession);
             isQrActive = true;
@@ -300,18 +348,16 @@
         }
 
         function listenToSession(sessionId) {
-            if (unsubscribeSnapshot) unsubscribeSnapshot(); // Önceki dinleyiciyi kapat
+            if (unsubscribeSnapshot) unsubscribeSnapshot(); 
             
             const colRef = getSessionCollection(sessionId);
             
-            // Veritabanındaki değişiklikleri anlık dinle (Canlı Senkronizasyon)
             unsubscribeSnapshot = onSnapshot(colRef, (snapshot) => {
                 attendanceData = snapshot.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
                 }));
                 
-                // Zaman damgasına göre sırala (Yeni gelenler en üstte)
                 attendanceData.sort((a, b) => b.timestamp - a.timestamp);
                 renderList();
             }, (error) => {
@@ -371,7 +417,7 @@
             if(!currentUser) return;
             if(confirm("Bu öğrenciyi yoklama listesinden silmek istediğinize emin misiniz?")) {
                 try {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'yoklama_' + currentSession, id));
+                    await deleteDoc(doc(getSessionCollection(currentSession), id));
                 } catch(error) {
                     console.error("Silme hatası:", error);
                 }
@@ -401,7 +447,7 @@
             if(!newNo || !newName) return alert("Lütfen boş alan bırakmayın.");
 
             try {
-                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'yoklama_' + currentSession, id), {
+                await updateDoc(doc(getSessionCollection(currentSession), id), {
                     number: newNo,
                     name: newName
                 });
@@ -416,7 +462,7 @@
             if(confirm("Tüm listeyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) {
                 try {
                     for(const student of attendanceData) {
-                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'yoklama_' + currentSession, student.id));
+                        await deleteDoc(doc(getSessionCollection(currentSession), student.id));
                     }
                 } catch(error) {
                     console.error("Toplu silme hatası:", error);
@@ -464,7 +510,6 @@
             try {
                 const colRef = getSessionCollection(currentSession);
                 
-                // Mükerrer kayıt kontrolü (Aynı öğrenci numarası ile atılmış imza var mı?)
                 const querySnapshot = await getDocs(colRef);
                 const existingDocs = querySnapshot.docs.map(d => d.data());
                 const exists = existingDocs.some(s => s.number === stdNo);
@@ -481,7 +526,6 @@
                 const timeString = now.getHours().toString().padStart(2, '0') + ':' + 
                                  now.getMinutes().toString().padStart(2, '0');
 
-                // Veritabanına Ekle (Firebase Bulutuna)
                 await addDoc(colRef, {
                     number: stdNo,
                     name: stdName,
