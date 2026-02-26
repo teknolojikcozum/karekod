@@ -394,6 +394,13 @@
                 document.getElementById('stdName').value = localStorage.getItem('saved_stdName');
             }
             
+            // KONTROL: URL'den gelen Sheet ID her zaman önceliklidir!
+            // Öğrenci başka bir hocanın karekodunu okuttuğunda eski veriyi ezer.
+            const urlSheetId = urlParams.get('sid');
+            if (urlSheetId) {
+                localStorage.setItem('yoklama_sheet_id', urlSheetId);
+            }
+
             if(!currentSession) {
                 showStudentError('Geçersiz veya hatalı karekod bağlantısı!');
             } else if (localStorage.getItem('attended_' + currentSession)) {
@@ -408,9 +415,7 @@
                     <span class="text-xs md:text-sm font-normal text-slate-500 mt-2 block">Lütfen tahtadaki güncel karekodu okutun.</span>
                 `, false);
             } else if (!getSheetId()) {
-                const urlSheetId = urlParams.get('sid');
-                if(urlSheetId) localStorage.setItem('yoklama_sheet_id', urlSheetId);
-                else showStudentError('Öğretmen Excel bağlantısını kurmamış.');
+                showStudentError('Öğretmen Excel bağlantısını kurmamış.');
             }
         } else {
             document.getElementById('teacherView').classList.remove('hidden');
