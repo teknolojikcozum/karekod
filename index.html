@@ -385,6 +385,7 @@
         let currentTimerSeconds = 300; 
 
         const getSheetId = () => sessionStorage.getItem('yoklama_sheet_id') || '';
+        const getSheetGid = () => sessionStorage.getItem('yoklama_sheet_gid') || '0';
 
         // Çift Yönlü Güvenlik: Cookie Okuma Fonksiyonu
         function getCookie(name) {
@@ -416,6 +417,11 @@
             const urlSheetId = urlParams.get('sid');
             if (urlSheetId) {
                 sessionStorage.setItem('yoklama_sheet_id', urlSheetId);
+            }
+            
+            const urlGid = urlParams.get('gid');
+            if (urlGid) {
+                sessionStorage.setItem('yoklama_sheet_gid', urlGid);
             }
 
             // Gelişmiş Kontrol: Cihaz hem local hem de cookie belleğinden sorgulanır
@@ -513,8 +519,9 @@
 
         function openSettings() {
             const savedId = getSheetId();
+            const savedGid = getSheetGid();
             if(savedId) {
-                document.getElementById('sheetUrlInput').value = `https://docs.google.com/spreadsheets/d/${savedId}/edit`;
+                document.getElementById('sheetUrlInput').value = `https://docs.google.com/spreadsheets/d/${savedId}/edit#gid=${savedGid}`;
             }
             document.getElementById('settingsModal').classList.remove('hidden');
         }
@@ -528,9 +535,15 @@
             return match ? match[1] : null;
         }
 
+        function extractGid(url) {
+            const match = url.match(/[#&]gid=([0-9]+)/);
+            return match ? match[1] : '0';
+        }
+
         function saveSettings() {
             const url = document.getElementById('sheetUrlInput').value.trim();
             const sheetId = extractSheetId(url);
+            const gid = extractGid(url);
             
             if(!sheetId) {
                 alert("Lütfen geçerli bir Google E-Tablo linki girin.");
@@ -538,20 +551,22 @@
             }
             
             sessionStorage.setItem('yoklama_sheet_id', sheetId);
+            sessionStorage.setItem('yoklama_sheet_gid', gid);
             closeSettings();
-            alert("Bağlantı başarıyla kaydedildi!");
+            alert("Bağlantı başarıyla kaydedildi! Farklı bir sekme (Tab) algılandıysa kayıtlar oraya yapılacaktır.");
             if(currentSession) startPolling(currentSession); 
         }
 
         async function fetchFromGAS(action, payload = {}) {
             if(!MASTER_GAS_URL) throw new Error("Ana Dağıtıcı URL'si eksik.");
             const sheetId = getSheetId();
+            const gid = getSheetGid();
             if(!sheetId) throw new Error("Öğretmen Sheet ID'si eksik!");
 
             try {
                 const response = await fetch(MASTER_GAS_URL, {
                     method: 'POST',
-                    body: JSON.stringify({ action, sheetId, ...payload })
+                    body: JSON.stringify({ action, sheetId, gid, ...payload })
                 });
                 const result = await response.json();
                 if(!result.success) throw new Error(result.error || "Bilinmeyen bir hata oluştu.");
@@ -637,11 +652,12 @@
 
             const baseUrl = window.location.origin + window.location.pathname;
             const encodedSheetId = encodeURIComponent(getSheetId()); 
+            const encodedGid = encodeURIComponent(getSheetGid()); 
             const encodedClassName = encodeURIComponent(currentClassName);
 
             function generateDynamicQR() {
                 const timestamp = Date.now();
-                const studentUrl = `${baseUrl}?mode=student&session=${currentSession}&t=${timestamp}&sid=${encodedSheetId}&c=${encodedClassName}`;
+                const studentUrl = `${baseUrl}?mode=student&session=${currentSession}&t=${timestamp}&sid=${encodedSheetId}&gid=${encodedGid}&c=${encodedClassName}`;
                 
                 document.getElementById('qrcode').innerHTML = '';
                 qrCodeObj = new QRCode(document.getElementById("qrcode"), {
@@ -1101,6 +1117,7 @@
                 renderList();
                 
                 sessionStorage.removeItem('yoklama_sheet_id');
+                sessionStorage.removeItem('yoklama_sheet_gid');
                 sessionStorage.removeItem('active_session');
                 sessionStorage.removeItem('active_class_name');
                 sessionStorage.removeItem('active_target_count');
