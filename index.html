@@ -238,32 +238,32 @@
                 <i data-lucide="user-minus" class="text-amber-500 w-5 h-5"></i> Devamsızları Bul
             </h3>
             
-            <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 md:p-4 mb-4 text-xs md:text-sm text-blue-900 shadow-sm flex-shrink-0">
-                <p class="font-bold flex items-center gap-2 mb-2 text-blue-700"><i data-lucide="info" class="w-5 h-5"></i> Excel'den Yükleme Nasıl Çalışır?</p>
+            <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 md:p-4 mb-4 text-xs md:text-sm text-blue-800 space-y-2 flex-shrink-0">
+                <p class="font-semibold flex items-center gap-1.5"><i data-lucide="info" class="w-4 h-4"></i> Sistem Nasıl Çalışır?</p>
                 <ul class="list-disc pl-5 space-y-1.5 text-[11px] md:text-xs">
-                    <li>Sistem hatasız çalışmak için <b>sadece Öğrenci Numarasına</b> bakar. Numaraları bulup, yanına isimlerini otomatik yazar.</li>
-                    <li>Yükleyeceğiniz Excel dosyasında mutlaka <b>"Numara"</b> başlıklı bir sütun olmalıdır. <i>(Büyük/küçük harf fark etmez. Örn: "NUMARA", "Numara", "numara" veya "Öğrenci No" yazabilirsiniz).</i></li>
-                    <li>Listeyi elinizle kopyalayıp aşağıdaki kutuya yapıştıracaksanız: Önce Numara, sonra boşluk bırakıp İsim Soyisim şeklinde girmelisiniz.</li>
+                    <li>Sistem karşılaştırmayı kesin ve hatasız olması için <b>sadece Öğrenci Numarası</b> üzerinden yapar.</li>
+                    <li><b>Excel'den Yükle</b> dediğinizde; numara sütununuzun yeri veya başlığı (Öğrenci No, NUMARA, No vb.) önemli değildir. Sistem numaraları bulur ve isimleri otomatik eşleştirir.</li>
+                    <li>Listeyi elinizle yapıştıracaksanız: <code>Numara [Boşluk] İsim Soyisim</code> formatında girmelisiniz.</li>
                 </ul>
             </div>
             
             <div class="flex-1 overflow-y-auto mb-2 space-y-3 md:space-y-4 pr-1">
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="block text-xs font-bold text-slate-700">Sınıf Listesi Girişi</label>
+                        <label class="block text-xs font-semibold text-slate-700">Sınıf Listesi Girişi</label>
                         <label for="excelFileInput" class="cursor-pointer bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] md:text-xs py-1.5 px-3 rounded-lg border border-emerald-200 transition flex items-center gap-1.5 font-bold shadow-sm">
                             <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Excel'den Yükle
                         </label>
                         <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleExcelUpload(event)">
                     </div>
-                    <textarea id="fullClassListInput" rows="4" class="w-full p-2 md:p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none text-[10px] md:text-xs font-mono bg-slate-50 shadow-inner" placeholder="Örn:&#10;202301 Ali Yılmaz&#10;202302 Ayşe Demir&#10;(Listeyi kopyalayıp buraya yapıştırabilir veya sağ üstten Excel yükleyebilirsiniz)"></textarea>
+                    <textarea id="fullClassListInput" rows="4" class="w-full p-2 md:p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none text-[10px] md:text-xs font-mono bg-slate-50" placeholder="Örn:&#10;202301 Ali Yılmaz&#10;202302 Ayşe Demir&#10;(Listeyi kopyalayıp buraya yapıştırabilir veya sağ üstten Excel yükleyebilirsiniz)"></textarea>
                 </div>
                 
-                <button onclick="calculateAbsentees()" class="w-full py-2 md:py-3 bg-amber-500 text-white rounded-xl hover:bg-amber-600 font-bold shadow-md transition text-sm flex justify-center items-center gap-2">
-                    <i data-lucide="scan-line" class="w-5 h-5"></i> Numaraları Karşılaştır ve Bul
+                <button onclick="calculateAbsentees()" class="w-full py-2 md:py-2.5 bg-amber-500 text-white rounded-xl hover:bg-amber-600 font-bold shadow-md transition text-sm flex justify-center items-center gap-2">
+                    <i data-lucide="scan-line" class="w-4 h-4"></i> Numaraları Karşılaştır ve Bul
                 </button>
 
-                <div id="absenteeResultArea" class="hidden border border-slate-200 rounded-xl overflow-hidden mt-2 md:mt-4 shadow-sm">
+                <div id="absenteeResultArea" class="hidden border border-slate-200 rounded-xl overflow-hidden mt-2 md:mt-4">
                     <div class="bg-slate-100 p-2 md:p-3 border-b border-slate-200 flex justify-between items-center">
                         <span class="font-bold text-slate-700 text-xs md:text-sm">Sonuçlar</span>
                         <span id="absenteeCountText" class="text-[10px] md:text-xs font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded shadow-sm">0 Yok</span>
@@ -380,6 +380,7 @@
         let searchTerm = ''; 
         let previousAttendanceCount = 0; 
         
+        // State Değişkenleri
         let currentClassName = '';
         let currentTargetCount = 0;
         let currentTimerSeconds = 300; 
@@ -990,11 +991,10 @@
                         }
                     }
 
-                    // EĞER NUMARA SÜTUNU BULUNAMADIYSA KULLANICIYI UYAR VE YÖNLENDİR
                     if (numCol === -1) {
                         alert("⚠️ DİKKAT: Excel dosyanızda 'Numara' başlıklı bir sütun bulunamadı!\n\nLütfen şunları kontrol edin:\n1. Listenizin en üst satırında başlıklar olmalı (Örn: 'Numara', 'İsim').\n2. Numaraların bulunduğu sütun başlığında 'No' veya 'Numara' kelimesi geçmeli.\n\nSistem hatalı işlem yapmamak için durduruldu. Lütfen dosyanızı düzenleyip tekrar yükleyin.");
                         document.getElementById('excelFileInput').value = ""; 
-                        return; // İşlemi iptal et
+                        return;
                     }
                     
                     let textResult = "";
@@ -1110,10 +1110,20 @@
                 if(isQrActive) endQrSession();
                 clearInterval(pollingInterval);
                 
+                // Tüm verileri ve UI'ı tamamen sıfırla
                 currentSession = null;
                 attendanceData = [];
+                absenteeData = [];
                 currentClassName = '';
                 currentTargetCount = 0;
+                searchTerm = '';
+                previousAttendanceCount = 0;
+                
+                // Ekrandaki arama ve diğer listeleri temizle
+                document.getElementById('searchInput').value = '';
+                document.getElementById('absenteeList').innerHTML = '';
+                document.getElementById('absenteeResultArea').classList.add('hidden');
+                
                 renderList();
                 
                 sessionStorage.removeItem('yoklama_sheet_id');
@@ -1133,11 +1143,11 @@
                 document.getElementById('expiredMessage').classList.add('hidden');
                 document.getElementById('syncIndicator').classList.add('hidden');
                 
-            document.getElementById('sheetUrlInput').value = '';
-            openSettings();
-            lucide.createIcons();
-        }
-    };
+                document.getElementById('sheetUrlInput').value = '';
+                openSettings();
+                lucide.createIcons();
+            }
+        };
 
     window.downloadExcel = () => {
         if(attendanceData.length === 0) return alert("İndirilecek veri yok.");
@@ -1170,7 +1180,6 @@
         window.submitAttendance = async (e) => {
             e.preventDefault();
             
-            // GÜÇLÜ KORUMA: Birden fazla sekme açılarak aynı anda imza atmayı reddeder
             if (localStorage.getItem('attended_' + currentSession) || getCookie('attended_' + currentSession)) {
                 alert("Bu cihazdan zaten imza atılmış!");
                 return;
@@ -1213,9 +1222,8 @@
                     return;
                 }
 
-                // BAŞARILI İŞLEM: Cihazı iki katmanlı olarak kilitle (LocalStorage + Cookie)
                 localStorage.setItem('attended_' + currentSession, 'true');
-                document.cookie = `attended_${currentSession}=true; max-age=86400; path=/`; // 24 Saatlik Çerez
+                document.cookie = `attended_${currentSession}=true; max-age=86400; path=/`; 
                 
                 localStorage.setItem('saved_stdNo', stdNo);
                 localStorage.setItem('saved_stdName', stdName);
