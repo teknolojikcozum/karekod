@@ -234,25 +234,34 @@
     <div id="absenteeModal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm p-4">
         <div class="bg-white rounded-2xl p-4 md:p-6 w-full max-w-lg shadow-2xl relative flex flex-col max-h-[90vh]">
             <button onclick="closeAbsenteeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i data-lucide="x"></i></button>
-            <h3 class="font-bold text-lg md:text-xl mb-1 text-slate-800 flex items-center gap-2">
+            <h3 class="font-bold text-lg md:text-xl mb-3 text-slate-800 flex items-center gap-2">
                 <i data-lucide="user-minus" class="text-amber-500 w-5 h-5"></i> Devamsızları Bul
             </h3>
-            <p class="text-[10px] md:text-xs text-slate-500 mb-4">Tam sınıf listesini aşağıya yapıştırın veya excel dosyası yükleyin. Sistem gelmeyenleri otomatik bulur.</p>
             
-            <div class="flex-1 overflow-y-auto mb-2 space-y-3 md:space-y-4">
+            <!-- YENİ: Kullanıcı Dostu Açıklama Alanı -->
+            <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 md:p-4 mb-4 text-xs md:text-sm text-blue-800 space-y-2 flex-shrink-0">
+                <p class="font-semibold flex items-center gap-1.5"><i data-lucide="info" class="w-4 h-4"></i> Sistem Nasıl Çalışır?</p>
+                <ul class="list-disc pl-5 space-y-1.5 text-[11px] md:text-xs">
+                    <li>Sistem karşılaştırmayı kesin ve hatasız olması için <b>sadece Öğrenci Numarası</b> üzerinden yapar.</li>
+                    <li><b>Excel'den Yükle</b> dediğinizde; numara sütununuzun yeri veya başlığı (Öğrenci No, NUMARA, No vb.) önemli değildir. Sistem numaraları bulur ve isimleri otomatik eşleştirir.</li>
+                    <li>Listeyi elinizle yapıştıracaksanız: <code>Numara [Boşluk] İsim Soyisim</code> formatında girmelisiniz.</li>
+                </ul>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto mb-2 space-y-3 md:space-y-4 pr-1">
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="block text-xs font-semibold text-slate-700">Tam Sınıf Listesi</label>
-                        <label for="excelFileInput" class="cursor-pointer bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] md:text-xs py-1 md:py-1.5 px-2 md:px-3 rounded-lg border border-emerald-200 transition flex items-center gap-1 font-medium">
-                            <i data-lucide="file-spreadsheet" class="w-3 h-3 md:w-4 md:h-4"></i> Excel'den Yükle
+                        <label class="block text-xs font-semibold text-slate-700">Sınıf Listesi Girişi</label>
+                        <label for="excelFileInput" class="cursor-pointer bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] md:text-xs py-1.5 px-3 rounded-lg border border-emerald-200 transition flex items-center gap-1.5 font-bold shadow-sm">
+                            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Excel'den Yükle
                         </label>
                         <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleExcelUpload(event)">
                     </div>
                     <textarea id="fullClassListInput" rows="4" class="w-full p-2 md:p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none text-[10px] md:text-xs font-mono bg-slate-50" placeholder="Örn:&#10;202301 Ali Yılmaz&#10;202302 Ayşe Demir&#10;(Listeyi kopyalayıp buraya yapıştırabilir veya sağ üstten Excel yükleyebilirsiniz)"></textarea>
                 </div>
                 
-                <button onclick="calculateAbsentees()" class="w-full py-2 md:py-2.5 bg-amber-500 text-white rounded-xl hover:bg-amber-600 font-semibold shadow-md transition text-sm">
-                    Karşılaştır ve Bul
+                <button onclick="calculateAbsentees()" class="w-full py-2 md:py-2.5 bg-amber-500 text-white rounded-xl hover:bg-amber-600 font-bold shadow-md transition text-sm flex justify-center items-center gap-2">
+                    <i data-lucide="scan-line" class="w-4 h-4"></i> Numaraları Karşılaştır ve Bul
                 </button>
 
                 <div id="absenteeResultArea" class="hidden border border-slate-200 rounded-xl overflow-hidden mt-2 md:mt-4">
@@ -930,7 +939,7 @@
             document.getElementById('absenteeModal').classList.add('hidden');
         };
 
-        // Yeni Eklenti: Excel dosyasından sınıf listesini okuma
+        // YENİ EKLENTİ: Akıllı Sütun Okumalı Excel Dosyası İşleme
         window.handleExcelUpload = (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -946,25 +955,66 @@
                     // Satır satır array formatında okur
                     const rawArray = XLSX.utils.sheet_to_json(worksheet, {header: 1});
                     
-                    let textResult = "";
-                    rawArray.forEach(row => {
-                        if(row && row.length > 0) {
-                            const num = row[0] ? row[0].toString().trim() : "";
-                            const name = row[1] ? row[1].toString().trim() : "";
+                    let numCol = -1;
+                    let nameCol = -1;
+                    let startRow = 0;
+
+                    // 1. ADIM: Başlıkları zekice analiz edip sütunları bul (Büyük/Küçük harf duyarsız)
+                    for(let i=0; i < Math.min(rawArray.length, 10); i++) {
+                        const row = rawArray[i];
+                        if(!row) continue;
+                        
+                        for(let j=0; j < row.length; j++) {
+                            // Yazıyı tamamen küçük harfe çevirip boşluk ve özel karakterleri atalım (Örn: "Öğrenci No:" -> "ogrencino")
+                            const cellStr = String(row[j] || '').toLowerCase().replace(/[\s\.\-\_]/g, '');
                             
-                            // Başlık satırı vs. değilse ve numara kısmı doluysa
-                            if(num && num.toLowerCase() !== "numara" && num.toLowerCase() !== "öğrenci no" && num.toLowerCase() !== "ogrenci no") {
+                            // Numara sütunu için ihtimaller
+                            if (cellStr === 'no' || cellStr.includes('numara') || cellStr.includes('ogrencino') || cellStr.includes('öğrencino') || cellStr.includes('ogrno') || cellStr.includes('stdno')) {
+                                numCol = j;
+                            } 
+                            // İsim sütunu için ihtimaller
+                            else if (cellStr === 'ad' || cellStr.includes('isim') || cellStr.includes('soyad') || cellStr.includes('adsoyad') || cellStr.includes('name')) {
+                                nameCol = j;
+                            }
+                        }
+                        
+                        // Numara sütunu bulunduğunda aramayı kes ve veri satırını belirle
+                        if(numCol !== -1) {
+                            startRow = i + 1;
+                            // Eğer isim sütunu tespit edilemediyse, numaranın hemen yanındaki sütunu İsim kabul et
+                            if(nameCol === -1) nameCol = numCol + 1; 
+                            break;
+                        }
+                    }
+
+                    // Eğer belirgin bir başlık bulunamadıysa Excel'deki ilk sütunu numara, ikinciyi isim say
+                    if (numCol === -1) {
+                        numCol = 0;
+                        nameCol = 1;
+                        startRow = 0;
+                    }
+                    
+                    // 2. ADIM: Tespit edilen sütunlara göre Numaraları ve İsimleri Çek
+                    let textResult = "";
+                    rawArray.forEach((row, index) => {
+                        if(index >= startRow && row && row.length > 0) {
+                            const num = row[numCol] ? String(row[numCol]).trim() : "";
+                            const name = row[nameCol] ? String(row[nameCol]).trim() : "İsimsiz";
+                            
+                            // Geçerli bir veri mi diye kontrol (Numara hücresi boş değilse listeye al)
+                            if(num && num !== "") { 
                                 textResult += `${num}\t${name}\n`;
                             }
                         }
                     });
                     
                     document.getElementById('fullClassListInput').value = textResult;
-                    alert("Excel listesi başarıyla yüklendi. Artık 'Karşılaştır ve Bul' butonuna basabilirsiniz.");
+                    alert("Excel listesi zekice okundu! 'Karşılaştır ve Bul' butonuna basarak devamsızları listeleyebilirsiniz.");
                 } catch(err) {
-                    alert("Excel okunurken bir hata oluştu. Lütfen dosya formatını kontrol edin. İlk sütunda numara, ikinci sütunda isim olmalıdır.");
+                    alert("Excel okunurken bir hata oluştu. Lütfen dosya formatını kontrol edin.");
+                    console.error(err);
                 }
-                // Aynı dosyayı tekrar seçebilmek için input'u sıfırla
+                // Aynı dosya defalarca seçilebilsin diye inputu sıfırla
                 document.getElementById('excelFileInput').value = "";
             };
             reader.readAsArrayBuffer(file);
@@ -979,21 +1029,31 @@
             const lines = rawData.split('\n');
             const fullList = [];
 
-            // Satır satır okuma ve parse etme
+            // Listeyi satır satır çöz ve parse et
             lines.forEach(line => {
                 if(!line.trim()) return;
-                // Excel'den kopyalanan veri genellikle Tab (\t) ile ayrılır. Ayrıca virgül de desteklenir.
-                const parts = line.split(/\t|,/);
-                const num = parts[0].trim();
-                const name = parts.length > 1 ? parts[1].trim() : "İsimsiz";
-                if(num) {
-                    fullList.push({ number: num, name: name });
+                
+                // \t (Tab), Virgül veya sadece boşluklara göre böler. İlk kısmı "Numara", geri kalan hepsini "İsim" yapar.
+                const parts = line.trim().split(/\t|,|\s+/); 
+                if (parts.length > 0) {
+                    const num = parts[0].trim();
+                    const name = parts.length > 1 ? parts.slice(1).join(" ").trim() : "İsimsiz";
+                    
+                    if(num) {
+                        fullList.push({ number: num, name: name });
+                    }
                 }
             });
 
-            // Gelenleri ve gelmeyenleri filtrele (karşılaştır)
-            const attendedNumbers = attendanceData.map(s => s.number.toString().trim());
-            absenteeData = fullList.filter(s => !attendedNumbers.includes(s.number.toString().trim()));
+            // Kesin Eşleşme İçin: Şu ana kadar imza atan tüm öğrencilerin numaralarını (boşluksuz, küçük harf ile) bir diziye al
+            const attendedNumbers = attendanceData.map(s => String(s.number).trim().toLowerCase());
+            
+            // SADECE NUMARAYA GÖRE filtreleme yap
+            absenteeData = fullList.filter(s => {
+                const listNum = String(s.number).trim().toLowerCase();
+                // Sınıf listesindeki bu numara, imza atan numaralar arasında YOKSA devamsızdır.
+                return !attendedNumbers.includes(listNum);
+            });
 
             // Ekrana Çizme
             const resultListEl = document.getElementById('absenteeList');
