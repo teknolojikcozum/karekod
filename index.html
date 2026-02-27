@@ -760,6 +760,27 @@
                 emptyState.classList.add('hidden');
                 
                 filteredData.forEach(student => {
+                    // TARİH FORMATI DÜZELTMESİ (GÜN.AY.YIL SAAT:DAKİKA)
+                    let displayTime = student.time;
+                    if (student.timestamp) {
+                        const dateObj = new Date(Number(student.timestamp));
+                        if (!isNaN(dateObj.getTime())) {
+                            const day = String(dateObj.getDate()).padStart(2, '0');
+                            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                            const year = dateObj.getFullYear();
+                            const hours = String(dateObj.getHours()).padStart(2, '0');
+                            const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+                            displayTime = `${day}.${month}.${year} ${hours}:${minutes}`;
+                        }
+                    } else if (typeof student.time === 'string' && student.time.includes('T')) {
+                        const d = new Date(student.time);
+                        if (!isNaN(d.getTime())) {
+                            const hours = String(d.getHours()).padStart(2, '0');
+                            const minutes = String(d.getMinutes()).padStart(2, '0');
+                            displayTime = `${hours}:${minutes}`;
+                        }
+                    }
+
                     const li = document.createElement('li');
                     li.className = "bg-white p-3 md:p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center group transition-all hover:shadow-md";
                     
@@ -773,7 +794,7 @@
                                 <div class="flex items-center gap-1.5 md:gap-2 text-[10px] md:text-xs text-slate-500">
                                     <span class="font-mono bg-slate-100 px-1 md:px-1.5 py-0.5 rounded">${student.number}</span>
                                     <span>•</span>
-                                    <span>${student.time}</span>
+                                    <span>${displayTime}</span>
                                 </div>
                             </div>
                         </div>
@@ -795,7 +816,8 @@
         window.deleteStudent = async (id) => {
             if(confirm("Bu öğrenciyi silmek istediğinize emin misiniz? Google Sheets'ten de silinecektir.")) {
                 try {
-                    attendanceData = attendanceData.filter(s => s.id !== id);
+                    // ID TIP UYUŞMAZLIĞINI ÇÖZMEK İÇİN STRING'E ÇEVİRİLDİ
+                    attendanceData = attendanceData.filter(s => String(s.id) !== String(id));
                     previousAttendanceCount = attendanceData.length; 
                     renderList();
                     await fetchFromGAS('delete', { session: currentSession, id: id });
@@ -807,7 +829,8 @@
         };
 
         window.openEditModal = (id) => {
-            const student = attendanceData.find(s => s.id === id);
+            // ID TIP UYUŞMAZLIĞINI ÇÖZMEK İÇİN STRING'E ÇEVİRİLDİ
+            const student = attendanceData.find(s => String(s.id) === String(id));
             if(student) {
                 document.getElementById('editId').value = student.id;
                 document.getElementById('editStdNo').value = student.number;
@@ -830,7 +853,8 @@
             window.closeEditModal();
 
             try {
-                const index = attendanceData.findIndex(s => s.id === id);
+                // ID TIP UYUŞMAZLIĞINI ÇÖZMEK İÇİN STRING'E ÇEVİRİLDİ
+                const index = attendanceData.findIndex(s => String(s.id) === String(id));
                 if(index > -1) {
                     attendanceData[index].number = newNo;
                     attendanceData[index].name = newName;
