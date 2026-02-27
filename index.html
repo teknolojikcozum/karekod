@@ -238,36 +238,35 @@
                 <i data-lucide="user-minus" class="text-amber-500 w-5 h-5"></i> Devamsızları Bul
             </h3>
             
-            <!-- YENİ: Kullanıcı Dostu Açıklama Alanı -->
-            <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 md:p-4 mb-4 text-xs md:text-sm text-blue-800 space-y-2 flex-shrink-0">
-                <p class="font-semibold flex items-center gap-1.5"><i data-lucide="info" class="w-4 h-4"></i> Sistem Nasıl Çalışır?</p>
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 md:p-4 mb-4 text-xs md:text-sm text-blue-900 shadow-sm flex-shrink-0">
+                <p class="font-bold flex items-center gap-2 mb-2 text-blue-700"><i data-lucide="info" class="w-5 h-5"></i> Excel'den Yükleme Nasıl Çalışır?</p>
                 <ul class="list-disc pl-5 space-y-1.5 text-[11px] md:text-xs">
-                    <li>Sistem karşılaştırmayı kesin ve hatasız olması için <b>sadece Öğrenci Numarası</b> üzerinden yapar.</li>
-                    <li><b>Excel'den Yükle</b> dediğinizde; numara sütununuzun yeri veya başlığı (Öğrenci No, NUMARA, No vb.) önemli değildir. Sistem numaraları bulur ve isimleri otomatik eşleştirir.</li>
-                    <li>Listeyi elinizle yapıştıracaksanız: <code>Numara [Boşluk] İsim Soyisim</code> formatında girmelisiniz.</li>
+                    <li>Sistem hatasız çalışmak için <b>sadece Öğrenci Numarasına</b> bakar. Numaraları bulup, yanına isimlerini otomatik yazar.</li>
+                    <li>Yükleyeceğiniz Excel dosyasında mutlaka <b>"Numara"</b> başlıklı bir sütun olmalıdır. <i>(Büyük/küçük harf fark etmez. Örn: "NUMARA", "Numara", "numara" veya "Öğrenci No" yazabilirsiniz).</i></li>
+                    <li>Listeyi elinizle kopyalayıp aşağıdaki kutuya yapıştıracaksanız: Önce Numara, sonra boşluk bırakıp İsim Soyisim şeklinde girmelisiniz.</li>
                 </ul>
             </div>
             
             <div class="flex-1 overflow-y-auto mb-2 space-y-3 md:space-y-4 pr-1">
                 <div>
                     <div class="flex justify-between items-center mb-2">
-                        <label class="block text-xs font-semibold text-slate-700">Sınıf Listesi Girişi</label>
+                        <label class="block text-xs font-bold text-slate-700">Sınıf Listesi Girişi</label>
                         <label for="excelFileInput" class="cursor-pointer bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] md:text-xs py-1.5 px-3 rounded-lg border border-emerald-200 transition flex items-center gap-1.5 font-bold shadow-sm">
                             <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Excel'den Yükle
                         </label>
                         <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleExcelUpload(event)">
                     </div>
-                    <textarea id="fullClassListInput" rows="4" class="w-full p-2 md:p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none text-[10px] md:text-xs font-mono bg-slate-50" placeholder="Örn:&#10;202301 Ali Yılmaz&#10;202302 Ayşe Demir&#10;(Listeyi kopyalayıp buraya yapıştırabilir veya sağ üstten Excel yükleyebilirsiniz)"></textarea>
+                    <textarea id="fullClassListInput" rows="4" class="w-full p-2 md:p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none text-[10px] md:text-xs font-mono bg-slate-50 shadow-inner" placeholder="Örn:&#10;202301 Ali Yılmaz&#10;202302 Ayşe Demir&#10;(Listeyi kopyalayıp buraya yapıştırabilir veya sağ üstten Excel yükleyebilirsiniz)"></textarea>
                 </div>
                 
-                <button onclick="calculateAbsentees()" class="w-full py-2 md:py-2.5 bg-amber-500 text-white rounded-xl hover:bg-amber-600 font-bold shadow-md transition text-sm flex justify-center items-center gap-2">
-                    <i data-lucide="scan-line" class="w-4 h-4"></i> Numaraları Karşılaştır ve Bul
+                <button onclick="calculateAbsentees()" class="w-full py-2 md:py-3 bg-amber-500 text-white rounded-xl hover:bg-amber-600 font-bold shadow-md transition text-sm flex justify-center items-center gap-2">
+                    <i data-lucide="scan-line" class="w-5 h-5"></i> Numaraları Karşılaştır ve Bul
                 </button>
 
-                <div id="absenteeResultArea" class="hidden border border-slate-200 rounded-xl overflow-hidden mt-2 md:mt-4">
+                <div id="absenteeResultArea" class="hidden border border-slate-200 rounded-xl overflow-hidden mt-2 md:mt-4 shadow-sm">
                     <div class="bg-slate-100 p-2 md:p-3 border-b border-slate-200 flex justify-between items-center">
                         <span class="font-bold text-slate-700 text-xs md:text-sm">Sonuçlar</span>
-                        <span id="absenteeCountText" class="text-[10px] md:text-xs font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded">0 Yok</span>
+                        <span id="absenteeCountText" class="text-[10px] md:text-xs font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded shadow-sm">0 Yok</span>
                     </div>
                     <ul id="absenteeList" class="max-h-32 md:max-h-48 overflow-y-auto bg-white p-1 md:p-2">
                         <!-- Devamsızlar buraya gelecek -->
@@ -276,9 +275,9 @@
             </div>
 
             <div class="mt-2 pt-3 md:pt-4 border-t border-slate-100 flex justify-end gap-2 md:gap-3">
-                <button onclick="closeAbsenteeModal()" class="px-3 md:px-4 py-1.5 md:py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs md:text-sm font-medium transition">Kapat</button>
-                <button id="downloadAbsenteesBtn" onclick="downloadAbsenteesExcel()" class="hidden px-3 md:px-4 py-1.5 md:py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 text-xs md:text-sm font-medium shadow-md transition flex items-center gap-1.5 md:gap-2">
-                    <i data-lucide="download" class="w-3 h-3 md:w-4 md:h-4"></i> Excel'e İndir
+                <button onclick="closeAbsenteeModal()" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs md:text-sm font-bold transition">Kapat</button>
+                <button id="downloadAbsenteesBtn" onclick="downloadAbsenteesExcel()" class="hidden px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 text-xs md:text-sm font-bold shadow-md transition flex items-center gap-1.5 md:gap-2">
+                    <i data-lucide="download" class="w-4 h-4"></i> Excel'e İndir
                 </button>
             </div>
         </div>
@@ -377,16 +376,27 @@
         let isQrActive = false;
         let qrCodeObj = null;
         let attendanceData = [];
-        let absenteeData = []; // Devamsızlar listesi
+        let absenteeData = []; 
         let searchTerm = ''; 
         let previousAttendanceCount = 0; 
         
-        // State Değişkenleri
         let currentClassName = '';
         let currentTargetCount = 0;
         let currentTimerSeconds = 300; 
 
         const getSheetId = () => sessionStorage.getItem('yoklama_sheet_id') || '';
+
+        // Çift Yönlü Güvenlik: Cookie Okuma Fonksiyonu
+        function getCookie(name) {
+            let nameEQ = name + "=";
+            let ca = document.cookie.split(';');
+            for(let i=0;i < ca.length;i++) {
+                let c = ca[i];
+                while (c.charAt(0)==' ') c = c.substring(1,c.length);
+                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+            }
+            return null;
+        }
 
         // --- BAŞLANGIÇ AYARLARI ---
         if (isStudentMode) {
@@ -403,16 +413,15 @@
                 document.getElementById('stdName').value = localStorage.getItem('saved_stdName');
             }
             
-            // KONTROL: URL'den gelen Sheet ID her zaman önceliklidir!
-            // Öğrenci başka bir hocanın karekodunu okuttuğunda eski veriyi ezer.
             const urlSheetId = urlParams.get('sid');
             if (urlSheetId) {
                 sessionStorage.setItem('yoklama_sheet_id', urlSheetId);
             }
 
+            // Gelişmiş Kontrol: Cihaz hem local hem de cookie belleğinden sorgulanır
             if(!currentSession) {
                 showStudentError('Geçersiz veya hatalı karekod bağlantısı!');
-            } else if (localStorage.getItem('attended_' + currentSession)) {
+            } else if (localStorage.getItem('attended_' + currentSession) || getCookie('attended_' + currentSession)) {
                 showStudentError(`
                     <i data-lucide="alert-triangle" class="w-12 h-12 md:w-16 md:h-16 mx-auto mb-4 opacity-80 text-amber-500"></i>
                     <span class="text-amber-600 text-base md:text-lg">Bu cihazdan zaten imza atılmış!</span>
@@ -486,7 +495,6 @@
             }
         }
 
-        // --- İLERLEME ÇUBUĞU GÜNCELLEME ---
         function updateProgress() {
             if (isStudentMode) return;
             const count = attendanceData.length;
@@ -503,7 +511,6 @@
             }
         }
 
-        // --- AYARLAR ---
         function openSettings() {
             const savedId = getSheetId();
             if(savedId) {
@@ -536,7 +543,6 @@
             if(currentSession) startPolling(currentSession); 
         }
 
-        // --- API ---
         async function fetchFromGAS(action, payload = {}) {
             if(!MASTER_GAS_URL) throw new Error("Ana Dağıtıcı URL'si eksik.");
             const sheetId = getSheetId();
@@ -596,8 +602,6 @@
             lucide.createIcons();
         }
 
-        // --- ÖĞRETMEN FONKSİYONLARI ---
-
         window.startQrSession = () => {
             if (!getSheetId()) return alert("Lütfen önce sağ üstteki ayarlar butonundan Google Excel linkinizi yapıştırın.");
 
@@ -642,7 +646,7 @@
                 document.getElementById('qrcode').innerHTML = '';
                 qrCodeObj = new QRCode(document.getElementById("qrcode"), {
                     text: studentUrl,
-                    width: window.innerWidth < 768 ? 160 : 200, // Mobilde biraz daha küçük karekod
+                    width: window.innerWidth < 768 ? 160 : 200, 
                     height: window.innerWidth < 768 ? 160 : 200,
                     colorDark : "#312e81", colorLight : "#ffffff",
                     correctLevel : QRCode.CorrectLevel.H
@@ -738,8 +742,6 @@
             }
         }
 
-        // --- CRUD İŞLEMLERİ (ÖĞRETMEN) ---
-
         window.handleSearch = (value) => {
             searchTerm = value.toLowerCase();
             renderList();
@@ -769,7 +771,6 @@
                 emptyState.classList.add('hidden');
                 
                 filteredData.forEach(student => {
-                    // TARİH FORMATI DÜZELTMESİ (GÜN.AY.YIL SAAT:DAKİKA)
                     let displayTime = student.time;
                     if (student.timestamp) {
                         const dateObj = new Date(Number(student.timestamp));
@@ -825,7 +826,6 @@
         window.deleteStudent = async (id) => {
             if(confirm("Bu öğrenciyi silmek istediğinize emin misiniz? Google Sheets'ten de silinecektir.")) {
                 try {
-                    // ID TIP UYUŞMAZLIĞINI ÇÖZMEK İÇİN STRING'E ÇEVİRİLDİ
                     attendanceData = attendanceData.filter(s => String(s.id) !== String(id));
                     previousAttendanceCount = attendanceData.length; 
                     renderList();
@@ -838,7 +838,6 @@
         };
 
         window.openEditModal = (id) => {
-            // ID TIP UYUŞMAZLIĞINI ÇÖZMEK İÇİN STRING'E ÇEVİRİLDİ
             const student = attendanceData.find(s => String(s.id) === String(id));
             if(student) {
                 document.getElementById('editId').value = student.id;
@@ -862,7 +861,6 @@
             window.closeEditModal();
 
             try {
-                // ID TIP UYUŞMAZLIĞINI ÇÖZMEK İÇİN STRING'E ÇEVİRİLDİ
                 const index = attendanceData.findIndex(s => String(s.id) === String(id));
                 if(index > -1) {
                     attendanceData[index].number = newNo;
@@ -876,7 +874,6 @@
             }
         };
 
-        // --- MANUEL ÖĞRENCİ EKLEME ---
         window.openManualAddModal = () => {
             if(!currentSession) return alert("Önce bir yoklama oturumu başlatmalısınız!");
             document.getElementById('manualStdNo').value = '';
@@ -923,13 +920,11 @@
             }
         };
 
-        // --- DEVAMSIZLARI BULMA MANTIĞI & EXCEL YÜKLEME ---
         window.openAbsenteeModal = () => {
             document.getElementById('absenteeModal').classList.remove('hidden');
             document.getElementById('absenteeResultArea').classList.add('hidden');
             document.getElementById('downloadAbsenteesBtn').classList.add('hidden');
             
-            // Önceden yapıştırılan listeyi hatırla
             if(localStorage.getItem('saved_full_class_list')) {
                 document.getElementById('fullClassListInput').value = localStorage.getItem('saved_full_class_list');
             }
@@ -939,7 +934,6 @@
             document.getElementById('absenteeModal').classList.add('hidden');
         };
 
-        // YENİ EKLENTİ: Akıllı Sütun Okumalı Excel Dosyası İşleme
         window.handleExcelUpload = (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -952,56 +946,47 @@
                     const firstSheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[firstSheetName];
                     
-                    // Satır satır array formatında okur
                     const rawArray = XLSX.utils.sheet_to_json(worksheet, {header: 1});
                     
                     let numCol = -1;
                     let nameCol = -1;
                     let startRow = 0;
 
-                    // 1. ADIM: Başlıkları zekice analiz edip sütunları bul (Büyük/Küçük harf duyarsız)
                     for(let i=0; i < Math.min(rawArray.length, 10); i++) {
                         const row = rawArray[i];
                         if(!row) continue;
                         
                         for(let j=0; j < row.length; j++) {
-                            // Yazıyı tamamen küçük harfe çevirip boşluk ve özel karakterleri atalım (Örn: "Öğrenci No:" -> "ogrencino")
                             const cellStr = String(row[j] || '').toLowerCase().replace(/[\s\.\-\_]/g, '');
                             
-                            // Numara sütunu için ihtimaller
                             if (cellStr === 'no' || cellStr.includes('numara') || cellStr.includes('ogrencino') || cellStr.includes('öğrencino') || cellStr.includes('ogrno') || cellStr.includes('stdno')) {
                                 numCol = j;
                             } 
-                            // İsim sütunu için ihtimaller
                             else if (cellStr === 'ad' || cellStr.includes('isim') || cellStr.includes('soyad') || cellStr.includes('adsoyad') || cellStr.includes('name')) {
                                 nameCol = j;
                             }
                         }
                         
-                        // Numara sütunu bulunduğunda aramayı kes ve veri satırını belirle
                         if(numCol !== -1) {
-                            startRow = i + 1;
-                            // Eğer isim sütunu tespit edilemediyse, numaranın hemen yanındaki sütunu İsim kabul et
+                            startRow = i + 1; 
                             if(nameCol === -1) nameCol = numCol + 1; 
                             break;
                         }
                     }
 
-                    // Eğer belirgin bir başlık bulunamadıysa Excel'deki ilk sütunu numara, ikinciyi isim say
+                    // EĞER NUMARA SÜTUNU BULUNAMADIYSA KULLANICIYI UYAR VE YÖNLENDİR
                     if (numCol === -1) {
-                        numCol = 0;
-                        nameCol = 1;
-                        startRow = 0;
+                        alert("⚠️ DİKKAT: Excel dosyanızda 'Numara' başlıklı bir sütun bulunamadı!\n\nLütfen şunları kontrol edin:\n1. Listenizin en üst satırında başlıklar olmalı (Örn: 'Numara', 'İsim').\n2. Numaraların bulunduğu sütun başlığında 'No' veya 'Numara' kelimesi geçmeli.\n\nSistem hatalı işlem yapmamak için durduruldu. Lütfen dosyanızı düzenleyip tekrar yükleyin.");
+                        document.getElementById('excelFileInput').value = ""; 
+                        return; // İşlemi iptal et
                     }
                     
-                    // 2. ADIM: Tespit edilen sütunlara göre Numaraları ve İsimleri Çek
                     let textResult = "";
                     rawArray.forEach((row, index) => {
                         if(index >= startRow && row && row.length > 0) {
                             const num = row[numCol] ? String(row[numCol]).trim() : "";
                             const name = row[nameCol] ? String(row[nameCol]).trim() : "İsimsiz";
                             
-                            // Geçerli bir veri mi diye kontrol (Numara hücresi boş değilse listeye al)
                             if(num && num !== "") { 
                                 textResult += `${num}\t${name}\n`;
                             }
@@ -1009,13 +994,12 @@
                     });
                     
                     document.getElementById('fullClassListInput').value = textResult;
-                    alert("Excel listesi zekice okundu! 'Karşılaştır ve Bul' butonuna basarak devamsızları listeleyebilirsiniz.");
+                    alert("Excel listesi akıllı bir şekilde okundu! Numaralar ve isimler başarılı şekilde çekildi.\nArtık 'Numaraları Karşılaştır ve Bul' butonuna basabilirsiniz.");
                 } catch(err) {
                     alert("Excel okunurken bir hata oluştu. Lütfen dosya formatını kontrol edin.");
                     console.error(err);
                 }
-                // Aynı dosya defalarca seçilebilsin diye inputu sıfırla
-                document.getElementById('excelFileInput').value = "";
+                document.getElementById('excelFileInput').value = ""; 
             };
             reader.readAsArrayBuffer(file);
         };
@@ -1029,11 +1013,9 @@
             const lines = rawData.split('\n');
             const fullList = [];
 
-            // Listeyi satır satır çöz ve parse et
             lines.forEach(line => {
                 if(!line.trim()) return;
                 
-                // \t (Tab), Virgül veya sadece boşluklara göre böler. İlk kısmı "Numara", geri kalan hepsini "İsim" yapar.
                 const parts = line.trim().split(/\t|,|\s+/); 
                 if (parts.length > 0) {
                     const num = parts[0].trim();
@@ -1045,17 +1027,13 @@
                 }
             });
 
-            // Kesin Eşleşme İçin: Şu ana kadar imza atan tüm öğrencilerin numaralarını (boşluksuz, küçük harf ile) bir diziye al
             const attendedNumbers = attendanceData.map(s => String(s.number).trim().toLowerCase());
             
-            // SADECE NUMARAYA GÖRE filtreleme yap
             absenteeData = fullList.filter(s => {
                 const listNum = String(s.number).trim().toLowerCase();
-                // Sınıf listesindeki bu numara, imza atan numaralar arasında YOKSA devamsızdır.
                 return !attendedNumbers.includes(listNum);
             });
 
-            // Ekrana Çizme
             const resultListEl = document.getElementById('absenteeList');
             resultListEl.innerHTML = '';
 
@@ -1096,7 +1074,6 @@
             XLSX.writeFile(workbook, `${className}_Devamsiz_Listesi.xlsx`);
         };
 
-        // --- GENEL İŞLEMLER ---
         window.clearList = async () => {
             if(attendanceData.length === 0) return;
             if(confirm("Mevcut listedeki TÜM kayıtları Excel tablosundan kalıcı olarak silmek istediğinize emin misiniz?")) {
@@ -1166,8 +1143,6 @@
         XLSX.writeFile(workbook, `${className}.xlsx`);
     };
 
-    // --- ÖĞRENCİ FONKSİYONLARI ---
-
     function showStudentError(htmlMsg, isFormVisible = false) {
             document.getElementById('studentForm').classList.toggle('hidden', !isFormVisible);
             const errDiv = document.getElementById('errorMessage');
@@ -1178,6 +1153,12 @@
         window.submitAttendance = async (e) => {
             e.preventDefault();
             
+            // GÜÇLÜ KORUMA: Birden fazla sekme açılarak aynı anda imza atmayı reddeder
+            if (localStorage.getItem('attended_' + currentSession) || getCookie('attended_' + currentSession)) {
+                alert("Bu cihazdan zaten imza atılmış!");
+                return;
+            }
+
             const stdNo = document.getElementById('stdNo').value.trim();
             const stdName = document.getElementById('stdName').value.trim();
             if(!stdNo || !stdName || !currentSession) return;
@@ -1215,7 +1196,10 @@
                     return;
                 }
 
+                // BAŞARILI İŞLEM: Cihazı iki katmanlı olarak kilitle (LocalStorage + Cookie)
                 localStorage.setItem('attended_' + currentSession, 'true');
+                document.cookie = `attended_${currentSession}=true; max-age=86400; path=/`; // 24 Saatlik Çerez
+                
                 localStorage.setItem('saved_stdNo', stdNo);
                 localStorage.setItem('saved_stdName', stdName);
 
