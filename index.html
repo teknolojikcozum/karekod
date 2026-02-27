@@ -377,7 +377,7 @@
         let currentTargetCount = 0;
         let currentTimerSeconds = 300; 
 
-        const getSheetId = () => localStorage.getItem('yoklama_sheet_id') || '';
+        const getSheetId = () => sessionStorage.getItem('yoklama_sheet_id') || '';
 
         // --- BAŞLANGIÇ AYARLARI ---
         if (isStudentMode) {
@@ -398,7 +398,7 @@
             // Öğrenci başka bir hocanın karekodunu okuttuğunda eski veriyi ezer.
             const urlSheetId = urlParams.get('sid');
             if (urlSheetId) {
-                localStorage.setItem('yoklama_sheet_id', urlSheetId);
+                sessionStorage.setItem('yoklama_sheet_id', urlSheetId);
             }
 
             if(!currentSession) {
@@ -421,10 +421,10 @@
             document.getElementById('teacherView').classList.remove('hidden');
             document.getElementById('teacherView').classList.add('flex');
             
-            if(!currentSession && localStorage.getItem('active_session')) {
-                currentSession = localStorage.getItem('active_session');
-                currentClassName = localStorage.getItem('active_class_name') || '';
-                currentTargetCount = parseInt(localStorage.getItem('active_target_count')) || 0;
+            if(!currentSession && sessionStorage.getItem('active_session')) {
+                currentSession = sessionStorage.getItem('active_session');
+                currentClassName = sessionStorage.getItem('active_class_name') || '';
+                currentTargetCount = parseInt(sessionStorage.getItem('active_target_count')) || 0;
 
                 if (currentClassName) {
                     document.getElementById('setupContainer').classList.add('hidden');
@@ -521,7 +521,7 @@
                 return;
             }
             
-            localStorage.setItem('yoklama_sheet_id', sheetId);
+            sessionStorage.setItem('yoklama_sheet_id', sheetId);
             closeSettings();
             alert("Bağlantı başarıyla kaydedildi!");
             if(currentSession) startPolling(currentSession); 
@@ -601,9 +601,9 @@
                     return alert("Lütfen başlamadan önce bir 'Ders Adı' girin.");
                 }
 
-                localStorage.setItem('active_class_name', currentClassName);
-                localStorage.setItem('active_target_count', currentTargetCount);
-                localStorage.setItem('active_timer_val', currentTimerSeconds);
+                sessionStorage.setItem('active_class_name', currentClassName);
+                sessionStorage.setItem('active_target_count', currentTargetCount);
+                sessionStorage.setItem('active_timer_val', currentTimerSeconds);
 
                 document.getElementById('displayClassName').textContent = currentClassName;
                 document.getElementById('setupContainer').classList.add('hidden');
@@ -619,7 +619,7 @@
             previousAttendanceCount = attendanceData.length;
 
             currentSession = Math.random().toString(36).substring(2, 15);
-            localStorage.setItem('active_session', currentSession);
+            sessionStorage.setItem('active_session', currentSession);
             isQrActive = true;
 
             const baseUrl = window.location.origin + window.location.pathname;
@@ -710,10 +710,10 @@
                 attendanceData = [];
                 renderList();
                 
-                localStorage.removeItem('active_session');
-                localStorage.removeItem('active_class_name');
-                localStorage.removeItem('active_target_count');
-                localStorage.removeItem('active_timer_val');
+                sessionStorage.removeItem('active_session');
+                sessionStorage.removeItem('active_class_name');
+                sessionStorage.removeItem('active_target_count');
+                sessionStorage.removeItem('active_timer_val');
                 currentClassName = '';
                 currentTargetCount = 0;
                 
@@ -1039,11 +1039,11 @@
                 currentTargetCount = 0;
                 renderList();
                 
-                localStorage.removeItem('yoklama_sheet_id');
-                localStorage.removeItem('active_session');
-                localStorage.removeItem('active_class_name');
-                localStorage.removeItem('active_target_count');
-                localStorage.removeItem('active_timer_val');
+                sessionStorage.removeItem('yoklama_sheet_id');
+                sessionStorage.removeItem('active_session');
+                sessionStorage.removeItem('active_class_name');
+                sessionStorage.removeItem('active_target_count');
+                sessionStorage.removeItem('active_timer_val');
                 
                 document.getElementById('setupContainer').classList.remove('hidden');
                 document.getElementById('activeSessionInfo').classList.add('hidden');
