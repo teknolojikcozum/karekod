@@ -804,6 +804,16 @@
             renderList();
         };
 
+        // Tarih formatlama yardımcı fonksiyonu
+        function getFormattedDate(dateObj) {
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const year = dateObj.getFullYear();
+            const hours = String(dateObj.getHours()).padStart(2, '0');
+            const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+            return `${day}.${month}.${year} ${hours}:${minutes}`;
+        }
+
         function renderList() {
             const listEl = document.getElementById('attendanceList');
             const emptyState = document.getElementById('emptyState');
@@ -828,25 +838,14 @@
                 emptyState.classList.add('hidden');
                 
                 filteredData.forEach(student => {
-                    let displayTime = student.time;
-                    if (student.timestamp) {
+                    let displayTime = student.timestampStr;
+                    if (!displayTime && student.timestamp) {
                         const dateObj = new Date(Number(student.timestamp));
                         if (!isNaN(dateObj.getTime())) {
-                            const day = String(dateObj.getDate()).padStart(2, '0');
-                            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-                            const year = dateObj.getFullYear();
-                            const hours = String(dateObj.getHours()).padStart(2, '0');
-                            const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-                            displayTime = `${day}.${month}.${year} ${hours}:${minutes}`;
-                        }
-                    } else if (typeof student.time === 'string' && student.time.includes('T')) {
-                        const d = new Date(student.time);
-                        if (!isNaN(d.getTime())) {
-                            const hours = String(d.getHours()).padStart(2, '0');
-                            const minutes = String(d.getMinutes()).padStart(2, '0');
-                            displayTime = `${hours}:${minutes}`;
+                            displayTime = getFormattedDate(dateObj);
                         }
                     }
+                    if (!displayTime) displayTime = student.time;
 
                     const li = document.createElement('li');
                     li.className = "bg-white p-3 md:p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center group transition-all hover:shadow-md";
@@ -861,7 +860,7 @@
                                 <div class="flex items-center gap-1.5 md:gap-2 text-[10px] md:text-xs text-slate-500">
                                     <span class="font-mono bg-slate-100 px-1 md:px-1.5 py-0.5 rounded">${student.number}</span>
                                     <span>•</span>
-                                    <span>${displayTime}</span>
+                                    <span>${student.time} (${displayTime})</span>
                                 </div>
                             </div>
                         </div>
@@ -950,15 +949,16 @@
             
             window.closeManualAddModal();
 
-            const now = new Date();
-            const timeString = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+            const formattedDate = getFormattedDate(new Date());
             
             const studentData = {
                 id: Date.now().toString() + Math.floor(Math.random() * 1000),
                 number: no,
                 name: name + " (Manuel)",
-                time: timeString,
-                timestamp: Date.now()
+                time: "İmzalandı",
+                timestampStr: formattedDate,
+                timestamp: Date.now(),
+                week: currentWeek || '1'
             };
 
             attendanceData.unshift(studentData);
@@ -1150,7 +1150,6 @@
                 if(isQrActive) endQrSession();
                 clearInterval(pollingInterval);
                 
-                // Tüm verileri ve UI'ı tamamen sıfırla
                 currentSession = null;
                 attendanceData = [];
                 absenteeData = [];
@@ -1160,7 +1159,6 @@
                 searchTerm = '';
                 previousAttendanceCount = 0;
                 
-                // Ekrandaki arama ve diğer listeleri temizle
                 document.getElementById('searchInput').value = '';
                 document.getElementById('absenteeList').innerHTML = '';
                 document.getElementById('absenteeResultArea').classList.add('hidden');
@@ -1203,11 +1201,24 @@
 
         const sortedData = [...attendanceData].sort((a, b) => a.name.localeCompare(b.name));
 
-        const excelData = sortedData.map(row => ({
-            "Öğrenci Numarası": row.number,
-            "Ad Soyad": row.name,
-            "İmza Zamanı": row.time
-        }));
+        const weekHeader = currentWeek ? `${currentWeek}. Hafta Durumu` : "Durum";
+
+        const excelData = sortedData.map(row => {
+            let tStr = row.timestampStr;
+            if(!tStr && row.timestamp) {
+                const dateObj = new Date(Number(row.timestamp));
+                if (!isNaN(dateObj.getTime())) {
+                    tStr = getFormattedDate(dateObj);
+                }
+            }
+
+            return {
+                "Öğrenci Numarası": row.number,
+                "Ad Soyad": row.name,
+                [weekHeader]: row.time || "İmzalandı",
+                "Zaman Damgası": tStr || ""
+            };
+        });
 
         const worksheet = XLSX.utils.json_to_sheet(excelData);
         const workbook = XLSX.utils.book_new();
@@ -1243,17 +1254,15 @@
             try {
                 if(!MASTER_GAS_URL) throw new Error("Sistem yapılandırılmamış");
 
-                const now = new Date();
-                const timeString = now.getHours().toString().padStart(2, '0') + ':' + 
-                                 now.getMinutes().toString().padStart(2, '0');
+                const formattedDate = getFormattedDate(new Date());
                 
                 const studentData = {
                     id: Date.now().toString() + Math.floor(Math.random() * 1000),
                     number: stdNo,
                     name: stdName,
-                    time: timeString,
+                    time: "İmzalandı",
+                    timestampStr: formattedDate,
                     timestamp: Date.now(),
-                    // Yeni eklenen hafta bilgisi
                     week: currentWeek || urlParams.get('w') || '1'
                 };
 
