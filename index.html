@@ -149,9 +149,9 @@
                     Karekodu Göster
                 </button>
 
-                <!-- DÜZENLENDİ: İd ve UI geribildirimi için buton güncellendi -->
-                <button id="newLessonBtn" onclick="resetSessionUI()" class="mt-5 md:mt-6 text-xs md:text-sm text-slate-500 hover:text-red-500 font-semibold hidden transition flex items-center justify-center gap-1 w-full disabled:opacity-50 disabled:cursor-not-allowed">
-                    <i data-lucide="log-out" class="w-4 h-4"></i> Oturumu Bitir / Yeni Kurulum Yap
+                <!-- DÜZENLENDİ: Buton çok daha belirgin, kırmızı ve büyük hale getirildi -->
+                <button id="newLessonBtn" onclick="resetSessionUI()" class="mt-5 md:mt-6 text-sm md:text-base text-white bg-red-500 hover:bg-red-600 font-bold py-3 px-4 rounded-xl hidden transition flex items-center justify-center gap-2 w-full shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i data-lucide="power" class="w-5 h-5"></i> Oturumu Bitir / Yeni Kurulum Yap
                 </button>
 
                 <div class="mt-5 md:mt-6 text-[10px] md:text-xs text-slate-400 flex flex-col items-center gap-1">
@@ -665,7 +665,8 @@
 
         async function syncData(sessionId) {
             try {
-                const res = await fetchFromGAS('get', { session: sessionId });
+                // DÜZENLENDİ: Sadece aktif olan haftanın verilerini çekmesi için currentWeek eklendi.
+                const res = await fetchFromGAS('get', { session: sessionId, week: currentWeek || 1 });
                 if (res.data) {
                     const newSortedData = res.data.sort((a, b) => b.timestamp - a.timestamp);
                     
@@ -962,7 +963,8 @@
                     attendanceData = attendanceData.filter(s => String(s.id) !== String(id));
                     previousAttendanceCount = attendanceData.length; 
                     renderList();
-                    await fetchFromGAS('delete', { session: currentSession, id: id });
+                    // DÜZENLENDİ: week parametresi eklendi
+                    await fetchFromGAS('delete', { session: currentSession, id: id, week: currentWeek || 1 });
                 } catch(error) {
                     alert("Silme işlemi başarısız oldu.");
                     syncData(currentSession);
@@ -1287,7 +1289,8 @@
                     attendanceData = [];
                     previousAttendanceCount = 0;
                     renderList();
-                    await fetchFromGAS('clear', { session: currentSession });
+                    // DÜZENLENDİ: week parametresi eklendi
+                    await fetchFromGAS('clear', { session: currentSession, week: currentWeek || 1 });
                 } catch(error) {
                     alert("Silme hatası.");
                     syncData(currentSession);
@@ -1295,8 +1298,28 @@
             }
         };
 
-        window.logout = () => {
+        // DÜZENLENDİ: Çıkış yaparken önce X sorma özelliği eklendi
+        window.logout = async () => {
             if(confirm("Excel bağlantısını kesip çıkış yapmak istediğinize emin misiniz? Devam eden bir yoklama oturumunuz varsa sonlandırılacaktır.")) {
+                
+                // Eğer devam eden bir oturum varsa devamsızlıkları işle
+                if(currentSession && currentWeek) {
+                    if(confirm("Çıkış yapmadan önce, sınıf listenizdeki gelmeyen öğrencilere otomatik olarak 'X' (Devamsız) yazılmasını ister misiniz?")) {
+                        const btn = document.querySelector('button[onclick="logout()"]');
+                        const originalText = btn.innerHTML;
+                        btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Devamsızlar (X) İşleniyor...';
+                        btn.disabled = true;
+                        lucide.createIcons();
+                        try {
+                            await fetchFromGAS('finalizeWeek', { session: currentSession, week: currentWeek });
+                        } catch(e) {
+                            console.error("X atama hatası:", e);
+                        }
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                    }
+                }
+
                 if(isQrActive) endQrSession();
                 clearInterval(pollingInterval);
                 
