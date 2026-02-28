@@ -154,6 +154,11 @@
                     <i data-lucide="power" class="w-5 h-5"></i> Oturumu Bitir / Yeni Kurulum Yap
                 </button>
 
+                <!-- DÜZENLENDİ: Öğretmeni bilgilendiren uyarı metni -->
+                <p class="mt-3 text-[10px] md:text-xs text-slate-500 bg-slate-100 p-2 rounded border border-slate-200 hidden" id="sessionEndInfoText">
+                    <i data-lucide="info" class="w-3 h-3 inline text-blue-500"></i> <b>Bilgi:</b> Oturumu bitirmek sadece o anki dersi sonlandırır. <b>Excel bağlantınız KOPMAZ.</b> Tamamen güvenli çıkış yapmak için en alttaki "Bağlantıyı Kes" butonunu kullanmalısınız.
+                </p>
+
                 <div class="mt-5 md:mt-6 text-[10px] md:text-xs text-slate-400 flex flex-col items-center gap-1">
                     <span>*Güvenlik: Karekod kopyalanmaya karşı her 10 saniyede bir otomatik yenilenir.</span>
                 </div>
@@ -209,8 +214,9 @@
             <!-- Listeyi Temizle Butonu -->
             <div class="p-3 md:p-4 border-t border-slate-100 bg-white space-y-2">
                 <button onclick="clearList()" class="w-full py-2 text-xs md:text-sm text-red-500 hover:bg-red-50 rounded-lg transition">Mevcut Listeyi Sil (Excel'den de silinir)</button>
+                <!-- DÜZENLENDİ: Geri Sayım Sayacı Eklendi -->
                 <button onclick="logout()" class="w-full py-2 text-xs md:text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition border border-slate-200 flex justify-center items-center gap-2">
-                    <i data-lucide="log-out" class="w-4 h-4"></i> Excel Bağlantısını Kes (Çıkış Yap)
+                    <i data-lucide="log-out" class="w-4 h-4 text-red-500"></i> <span class="font-semibold">Excel Bağlantısını Kes</span> <span id="logoutCountdown" class="text-red-500 font-mono font-bold tracking-wider ml-1"></span>
                 </button>
             </div>
         </div>
@@ -443,6 +449,7 @@
         let timerInterval;
         let qrRefreshInterval;
         let pollingInterval;
+        let autoLogoutInterval; // DÜZENLENDİ: Otomatik çıkış sayacı
         let isQrActive = false;
         let qrCodeObj = null;
         let attendanceData = [];
@@ -469,6 +476,99 @@
                 if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
             }
             return null;
+        }
+
+        // --- OTOMATİK ÇIKIŞ ZAMANLAYICISI (10 DAKİKA) ---
+        function startAutoLogoutTimer() {
+            clearInterval(autoLogoutInterval);
+            let connectTime = sessionStorage.getItem('excel_connect_time');
+            if (!connectTime) {
+                connectTime = Date.now();
+                sessionStorage.setItem('excel_connect_time', connectTime);
+            }
+
+            autoLogoutInterval = setInterval(() => {
+                const now = Date.now();
+                const elapsedSeconds = Math.floor((now - parseInt(connectTime)) / 1000);
+                const remainingSeconds = 600 - elapsedSeconds; // 600 saniye = 10 dakika
+
+                const countdownEl = document.getElementById('logoutCountdown');
+                
+                if (remainingSeconds <= 0) {
+                    clearInterval(autoLogoutInterval);
+                    if(countdownEl) countdownEl.innerText = `(00:00)`;
+                    executeAutoLogout(); // Süre dolduğunda çıkış tetiklenir
+                } else {
+                    const m = String(Math.floor(remainingSeconds / 60)).padStart(2, '0');
+                    const s = String(remainingSeconds % 60).padStart(2, '0');
+                    if(countdownEl) countdownEl.innerText = `(${m}:${s})`;
+                }
+            }, 1000);
+        }
+
+        function resetAutoLogoutTimer() {
+            sessionStorage.setItem('excel_connect_time', Date.now());
+            startAutoLogoutTimer();
+        }
+
+        async function executeAutoLogout() {
+            // Arka planda unutulan hocanın X'lerini atalım
+            if(currentSession && currentWeek) {
+                try {
+                    await fetchFromGAS('finalizeWeek', { session: currentSession, week: currentWeek });
+                } catch(e) {}
+            }
+
+            if(isQrActive) endQrSession();
+            clearInterval(pollingInterval);
+            
+            // Sistemi sıfırla
+            currentSession = null;
+            attendanceData = [];
+            absenteeData = [];
+            currentClassName = '';
+            currentWeek = '';
+            currentTargetCount = 0;
+            searchTerm = '';
+            previousAttendanceCount = 0;
+            
+            document.getElementById('searchInput').value = '';
+            document.getElementById('absenteeList').innerHTML = '';
+            document.getElementById('absenteeResultArea').classList.add('hidden');
+            
+            renderList();
+            
+            // Tüm hafızayı temizle
+            sessionStorage.removeItem('yoklama_sheet_id');
+            sessionStorage.removeItem('yoklama_sheet_gid');
+            sessionStorage.removeItem('active_session');
+            sessionStorage.removeItem('active_class_name');
+            sessionStorage.removeItem('active_week');
+            sessionStorage.removeItem('active_target_count');
+            sessionStorage.removeItem('active_timer_val');
+            sessionStorage.removeItem('excel_connect_time');
+            
+            document.getElementById('setupContainer').classList.remove('hidden');
+            document.getElementById('activeSessionInfo').classList.add('hidden');
+            document.getElementById('newLessonBtn').classList.add('hidden');
+            document.getElementById('sessionEndInfoText').classList.add('hidden');
+            document.getElementById('classNameInput').value = '';
+            document.getElementById('weekInput').value = '1';
+            document.getElementById('targetCountInput').value = '';
+            document.getElementById('timerInput').value = '300';
+            document.getElementById('startQrBtn').innerHTML = '<i data-lucide="qr-code"></i> Karekodu Göster';
+            document.getElementById('expiredMessage').classList.add('hidden');
+            document.getElementById('syncIndicator').classList.add('hidden');
+            
+            document.getElementById('sheetUrlInput').value = '';
+            lucide.createIcons();
+
+            const countdownEl = document.getElementById('logoutCountdown');
+            if(countdownEl) countdownEl.innerText = '';
+
+            // Kullanıcıyı bilgilendir
+            alert("Güvenlik Bildirimi: İşlem yapılmayan 10 dakikalık süreniz dolduğu için cihaz güvenliğiniz adına Excel bağlantınız otomatik olarak kesilmiştir. Devamsızlıklar (varsa) işlenmiştir.");
+            openSettings();
         }
 
         // --- BAŞLANGIÇ AYARLARI ---
@@ -530,13 +630,17 @@
                     document.getElementById('setupContainer').classList.add('hidden');
                     document.getElementById('activeSessionInfo').classList.remove('hidden');
                     document.getElementById('newLessonBtn').classList.remove('hidden');
+                    document.getElementById('sessionEndInfoText').classList.remove('hidden');
                     
                     let displayTitle = currentClassName;
                     if (currentWeek) displayTitle += " - " + currentWeek + ". Hafta";
                     document.getElementById('displayClassName').textContent = displayTitle;
                 }
 
-                if(getSheetId()) startPolling(currentSession);
+                if(getSheetId()) {
+                    startPolling(currentSession);
+                    startAutoLogoutTimer(); // DÜZENLENDİ: Cihaz yüklendiğinde sayaç da başlar
+                }
             }
 
             if(!getSheetId()) {
@@ -633,6 +737,8 @@
             sessionStorage.setItem('yoklama_sheet_gid', gid);
             closeSettings();
             alert("Bağlantı başarıyla kaydedildi! Farklı bir sekme (Tab) algılandıysa kayıtlar oraya yapılacaktır.");
+            
+            resetAutoLogoutTimer(); // DÜZENLENDİ: Bağlantı kurulduğunda zamanlayıcı sıfırlanır
             if(currentSession) startPolling(currentSession); 
         }
 
@@ -665,7 +771,6 @@
 
         async function syncData(sessionId) {
             try {
-                // DÜZENLENDİ: Sadece aktif olan haftanın verilerini çekmesi için currentWeek eklendi.
                 const res = await fetchFromGAS('get', { session: sessionId, week: currentWeek || 1 });
                 if (res.data) {
                     const newSortedData = res.data.sort((a, b) => b.timestamp - a.timestamp);
@@ -722,6 +827,7 @@
                 document.getElementById('setupContainer').classList.add('hidden');
                 document.getElementById('activeSessionInfo').classList.remove('hidden');
                 document.getElementById('newLessonBtn').classList.remove('hidden');
+                document.getElementById('sessionEndInfoText').classList.remove('hidden');
             }
 
             clearInterval(timerInterval);
@@ -734,6 +840,8 @@
             currentSession = Math.random().toString(36).substring(2, 15);
             sessionStorage.setItem('active_session', currentSession);
             isQrActive = true;
+            
+            resetAutoLogoutTimer(); // DÜZENLENDİ: Yeni ders başlatıldığında zamanlayıcıyı sıfırla
 
             const baseUrl = window.location.origin + window.location.pathname;
             const encodedSheetId = encodeURIComponent(getSheetId()); 
@@ -817,11 +925,10 @@
             }
         }
 
-        // DÜZENLENDİ: Oturumu kapatırken gelmeyenlere X atanması
         window.resetSessionUI = async () => {
-            if(confirm("Ders oturumunu kapatmak üzeresiniz.\n\nEğer sınıf listeniz Excel'de yüklüyse, bu hafta için imza atmayan tüm öğrencilere otomatik olarak 'X' (Devamsız) yazılacaktır.\n\nOnaylıyor musunuz?")) {
+            if(confirm("Ders oturumunu kapatmak üzeresiniz.\n\nEğer sınıf listeniz Excel'de yüklüyse, bu hafta için imza atmayan tüm öğrencilere otomatik olarak 'X' (Devamsız) yazılacaktır.\n\nOnaylıyor musunuz?\n\n(DİKKAT: Bu işlem Excel bağlantınızı KESMEZ. Tamamen çıkış yapmak için sağ alttaki menüyü kullanın.)")) {
                 
-                // Kullanıcıya işlemin devam ettiğini gösterelim (UX iyileştirmesi)
+                // Kullanıcıya işlemin devam ettiğini gösterelim
                 const btn = document.getElementById('newLessonBtn');
                 const originalText = btn.innerHTML;
                 btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Kapatılıyor ve Kaydediliyor...';
@@ -829,7 +936,6 @@
                 lucide.createIcons();
 
                 try {
-                    // Arka plandaki Apps Script'e 'bu haftanın gelmeyenlerine X at' sinyali gönder
                     if(currentSession && currentWeek) {
                         await fetchFromGAS('finalizeWeek', { session: currentSession, week: currentWeek });
                     }
@@ -856,9 +962,9 @@
                 
                 document.getElementById('setupContainer').classList.remove('hidden');
                 document.getElementById('activeSessionInfo').classList.add('hidden');
-                btn.classList.add('hidden'); // Butonu gizle (id=newLessonBtn)
+                btn.classList.add('hidden'); 
+                document.getElementById('sessionEndInfoText').classList.add('hidden'); // Bilgi mesajını gizle
                 
-                // Form inputlarını sıfırla
                 document.getElementById('classNameInput').value = '';
                 document.getElementById('weekInput').value = '1';
                 document.getElementById('targetCountInput').value = '';
@@ -867,10 +973,10 @@
                 document.getElementById('startQrBtn').innerHTML = '<i data-lucide="qr-code"></i> Karekodu Göster';
                 document.getElementById('expiredMessage').classList.add('hidden');
                 
-                // Butonu eski haline getir
                 btn.innerHTML = originalText;
                 btn.disabled = false;
                 
+                resetAutoLogoutTimer(); // DÜZENLENDİ: Oturum bittikten sonra unutup giden hoca için zamanlayıcıyı sıfırla
                 lucide.createIcons();
             }
         }
@@ -880,7 +986,6 @@
             renderList();
         };
 
-        // Tarih formatlama yardımcı fonksiyonu
         function getFormattedDate(dateObj) {
             const day = String(dateObj.getDate()).padStart(2, '0');
             const month = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -963,7 +1068,6 @@
                     attendanceData = attendanceData.filter(s => String(s.id) !== String(id));
                     previousAttendanceCount = attendanceData.length; 
                     renderList();
-                    // DÜZENLENDİ: week parametresi eklendi
                     await fetchFromGAS('delete', { session: currentSession, id: id, week: currentWeek || 1 });
                 } catch(error) {
                     alert("Silme işlemi başarısız oldu.");
@@ -1289,7 +1393,6 @@
                     attendanceData = [];
                     previousAttendanceCount = 0;
                     renderList();
-                    // DÜZENLENDİ: week parametresi eklendi
                     await fetchFromGAS('clear', { session: currentSession, week: currentWeek || 1 });
                 } catch(error) {
                     alert("Silme hatası.");
@@ -1298,11 +1401,9 @@
             }
         };
 
-        // DÜZENLENDİ: Çıkış yaparken önce X sorma özelliği eklendi
         window.logout = async () => {
             if(confirm("Excel bağlantısını kesip çıkış yapmak istediğinize emin misiniz? Devam eden bir yoklama oturumunuz varsa sonlandırılacaktır.")) {
                 
-                // Eğer devam eden bir oturum varsa devamsızlıkları işle
                 if(currentSession && currentWeek) {
                     if(confirm("Çıkış yapmadan önce, sınıf listenizdeki gelmeyen öğrencilere otomatik olarak 'X' (Devamsız) yazılmasını ister misiniz?")) {
                         const btn = document.querySelector('button[onclick="logout()"]');
@@ -1322,6 +1423,7 @@
 
                 if(isQrActive) endQrSession();
                 clearInterval(pollingInterval);
+                clearInterval(autoLogoutInterval); // Geri sayımı durdur
                 
                 // Tüm verileri ve UI'ı tamamen sıfırla
                 currentSession = null;
@@ -1347,10 +1449,12 @@
                 sessionStorage.removeItem('active_week');
                 sessionStorage.removeItem('active_target_count');
                 sessionStorage.removeItem('active_timer_val');
+                sessionStorage.removeItem('excel_connect_time');
                 
                 document.getElementById('setupContainer').classList.remove('hidden');
                 document.getElementById('activeSessionInfo').classList.add('hidden');
                 document.getElementById('newLessonBtn').classList.add('hidden');
+                document.getElementById('sessionEndInfoText').classList.add('hidden'); // Bilgi mesajını gizle
                 document.getElementById('classNameInput').value = '';
                 document.getElementById('weekInput').value = '1';
                 document.getElementById('targetCountInput').value = '';
@@ -1359,6 +1463,9 @@
                 document.getElementById('expiredMessage').classList.add('hidden');
                 document.getElementById('syncIndicator').classList.add('hidden');
                 
+                const countdownEl = document.getElementById('logoutCountdown');
+                if(countdownEl) countdownEl.innerText = '';
+
                 document.getElementById('sheetUrlInput').value = '';
                 openSettings();
                 lucide.createIcons();
