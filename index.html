@@ -168,6 +168,10 @@
                     <p class="text-xs md:text-sm text-slate-500"><span id="studentCount">0</span> Öğrenci Katıldı</p>
                 </div>
                 <div class="flex gap-2">
+                    <!-- Dönemlik Rapor Butonu -->
+                    <button onclick="openReportModal()" class="bg-blue-100 hover:bg-blue-200 text-blue-700 p-2 rounded-lg transition-colors" title="Dönemlik Rapor (Karne)">
+                        <i data-lucide="bar-chart-2" class="w-4 h-4 md:w-5 md:h-5"></i>
+                    </button>
                     <!-- Devamsızları Bul Butonu -->
                     <button onclick="openAbsenteeModal()" class="bg-amber-100 hover:bg-amber-200 text-amber-700 p-2 rounded-lg transition-colors" title="Devamsızları Bul">
                         <i data-lucide="user-minus" class="w-4 h-4 md:w-5 md:h-5"></i>
@@ -371,6 +375,51 @@
             <div class="mt-5 md:mt-6 flex justify-end gap-2 md:gap-3">
                 <button onclick="closeManualAddModal()" class="px-3 py-1.5 md:px-4 md:py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm">İptal</button>
                 <button onclick="saveManualAdd()" class="px-3 py-1.5 md:px-4 md:py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm">Listeye Ekle</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dönemlik Rapor (Karne) Modalı -->
+    <div id="reportModal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm p-2 md:p-4">
+        <div class="bg-white rounded-2xl p-4 md:p-6 w-full max-w-6xl shadow-2xl relative flex flex-col max-h-[95vh]">
+            <button onclick="closeReportModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5 md:w-6 md:h-6"></i></button>
+            
+            <h3 class="font-bold text-lg md:text-2xl mb-1 text-slate-800 flex items-center gap-2">
+                <i data-lucide="bar-chart-2" class="text-blue-600 w-5 h-5 md:w-6 md:h-6"></i> Dönemlik Öğrenci Karnesi
+            </h3>
+            <p class="text-[10px] md:text-xs text-slate-500 mb-4 md:mb-6">Sınıfınızdaki tüm öğrencilerin 14 haftalık devamsızlık durumu tek ekranda aşağıda listelenmektedir.</p>
+
+            <div class="flex-1 overflow-auto border border-slate-200 rounded-xl shadow-inner bg-slate-50 relative">
+                <table class="w-full text-left border-collapse min-w-[900px]">
+                    <thead class="bg-slate-200 text-slate-700 text-[10px] md:text-xs uppercase sticky top-0 shadow-sm z-10">
+                        <tr>
+                            <th class="p-2 md:p-3 font-bold border-b border-slate-300">Öğrenci No</th>
+                            <th class="p-2 md:p-3 font-bold border-b border-slate-300">Ad Soyad</th>
+                            <th class="p-1 md:p-2 text-center font-bold border-b border-l border-slate-300" title="1. Hafta">H1</th>
+                            <th class="p-1 md:p-2 text-center font-bold border-b border-l border-slate-300" title="2. Hafta">H2</th>
+                            <th class="p-1 md:p-2 text-center font-bold border-b border-l border-slate-300" title="3. Hafta">H3</th>
+                            <th class="p-1 md:p-2 text-center font-bold border-b border-l border-slate-300" title="4. Hafta">H4</th>
+                            <th class="p-1 md:p-2 text-center font-bold border-b border-l border-slate-300" title="5. Hafta">H5</th>
+                            <th class="p-1 md:p-2 text-center font-bold border-b border-l border-slate-300" title="6. Hafta">H6</th>
+                            <th class="p-1 md:p-2 text-center font-bold border-b border-l border-slate-300" title="7. Hafta">H7</th>
+                            <th class="p-1 md:p-2 text-center font-bold border-b border-l border-slate-300" title="8. Hafta">H8</th>
+                            <th class="p-1 md:p-2 text-center font-bold border-b border-l border-slate-300" title="9. Hafta">H9</th>
+                            <th class="p-1 md:p-2 text-center font-bold border-b border-l border-slate-300" title="10. Hafta">H10</th>
+                            <th class="p-1 md:p-2 text-center font-bold border-b border-l border-slate-300" title="11. Hafta">H11</th>
+                            <th class="p-1 md:p-2 text-center font-bold border-b border-l border-slate-300" title="12. Hafta">H12</th>
+                            <th class="p-1 md:p-2 text-center font-bold border-b border-l border-slate-300" title="13. Hafta">H13</th>
+                            <th class="p-1 md:p-2 text-center font-bold border-b border-l border-slate-300" title="14. Hafta">H14</th>
+                            <th class="p-2 md:p-3 text-center font-black text-indigo-700 border-b border-l border-slate-300 bg-indigo-100/50">Top.</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportTableBody" class="bg-white">
+                        <!-- JS ile dinamik doldurulacak -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-4 pt-3 md:pt-4 border-t border-slate-100 flex justify-end gap-2 md:gap-3">
+                <button onclick="closeReportModal()" class="px-4 md:px-5 py-2 md:py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-sm font-bold transition shadow-sm border border-slate-200">Kapat</button>
             </div>
         </div>
     </div>
@@ -1004,6 +1053,79 @@
                 syncData(currentSession);
             }
         };
+
+        // --- DÖNEMLİK RAPOR (KARNE) MANTIĞI ---
+        window.openReportModal = async () => {
+            if(!currentSession && !getSheetId()) {
+                return alert("Lütfen önce bir Excel bağlantısı kurun ve ayarları kaydedin.");
+            }
+            document.getElementById('reportModal').classList.remove('hidden');
+            const tbody = document.getElementById('reportTableBody');
+            tbody.innerHTML = '<tr><td colspan="17" class="text-center p-8 text-slate-500 font-semibold"><i data-lucide="loader-2" class="w-6 h-6 animate-spin inline-block mr-2 text-blue-500"></i> Excel\'den güncel dönem verileri çekiliyor... Lütfen bekleyin.</td></tr>';
+            lucide.createIcons();
+
+            try {
+                const res = await fetchFromGAS('getMatrix');
+                if(res.success && res.matrix) {
+                    renderReportTable(res.matrix);
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="17" class="text-center p-6 text-red-500 font-semibold">Veri alınamadı. Tablonuz henüz boş olabilir.</td></tr>';
+                }
+            } catch(e) {
+                tbody.innerHTML = '<tr><td colspan="17" class="text-center p-6 text-red-500 font-semibold">Hata: Bağlantı kurulamadı. Lütfen internetinizi ve Excel izinlerinizi kontrol edin.</td></tr>';
+            }
+            lucide.createIcons();
+        };
+
+        window.closeReportModal = () => {
+            document.getElementById('reportModal').classList.add('hidden');
+        };
+
+        function renderReportTable(matrix) {
+            const tbody = document.getElementById('reportTableBody');
+            tbody.innerHTML = '';
+            
+            if(matrix.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="17" class="text-center p-8 text-slate-500 font-medium">Sınıf listesi henüz boş. Excel listenize öğrenci eklendikçe burada görünecektir.</td></tr>';
+                return;
+            }
+
+            matrix.forEach(student => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-slate-100 hover:bg-blue-50 transition-colors text-[10px] md:text-xs";
+
+                let weeksHtml = '';
+                let totalPresent = 0;
+
+                student.weeks.forEach(w => {
+                    const val = String(w).trim();
+                    const isPresent = (val === '✓' || val.includes('✓') || val === 'İmzalandı');
+                    const isAbsent = (val === 'X' || val === 'x');
+                    
+                    let cellClass = "text-slate-300 font-medium"; 
+                    let cellText = "-";
+                    
+                    if(isPresent) {
+                        cellClass = "text-emerald-600 font-bold bg-emerald-50/40";
+                        cellText = "✓";
+                        totalPresent++;
+                    } else if (isAbsent) {
+                        cellClass = "text-red-500 font-bold bg-red-50/40";
+                        cellText = "X";
+                    }
+
+                    weeksHtml += `<td class="p-1 md:p-2 text-center border-l border-slate-100 ${cellClass}">${cellText}</td>`;
+                });
+
+                tr.innerHTML = `
+                    <td class="p-2 md:p-3 font-mono text-slate-600 font-semibold whitespace-nowrap">${student.number}</td>
+                    <td class="p-2 md:p-3 font-bold text-slate-800 whitespace-nowrap min-w-[120px] max-w-[200px] truncate" title="${student.name}">${student.name}</td>
+                    ${weeksHtml}
+                    <td class="p-2 md:p-3 text-center font-black text-indigo-600 border-l border-slate-200 bg-indigo-50/50">${totalPresent}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
 
         window.openAbsenteeModal = () => {
             document.getElementById('absenteeModal').classList.remove('hidden');
