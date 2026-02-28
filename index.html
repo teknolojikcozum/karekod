@@ -149,7 +149,8 @@
                     Karekodu Göster
                 </button>
 
-                <button id="newLessonBtn" onclick="resetSessionUI()" class="mt-6 text-xs md:text-sm text-slate-500 hover:text-red-500 font-semibold hidden transition flex items-center justify-center gap-1 w-full">
+                <!-- DÜZENLENDİ: İd ve UI geribildirimi için buton güncellendi -->
+                <button id="newLessonBtn" onclick="resetSessionUI()" class="mt-6 text-xs md:text-sm text-slate-500 hover:text-red-500 font-semibold hidden transition flex items-center justify-center gap-1 w-full disabled:opacity-50 disabled:cursor-not-allowed">
                     <i data-lucide="log-out" class="w-4 h-4"></i> Oturumu Bitir / Yeni Kurulum Yap
                 </button>
 
@@ -766,8 +767,28 @@
             }
         }
 
-        window.resetSessionUI = () => {
-            if(confirm("Mevcut ders oturumunu kapatıp tamamen yeni bir derse geçmek veya yeni bir kurulum yapmak istediğinize emin misiniz?")) {
+        // DÜZENLENDİ: Oturumu kapatırken gelmeyenlere X atanması
+        window.resetSessionUI = async () => {
+            if(confirm("Ders oturumunu kapatmak üzeresiniz.\n\nEğer sınıf listeniz Excel'de yüklüyse, bu hafta için imza atmayan tüm öğrencilere otomatik olarak 'X' (Devamsız) yazılacaktır.\n\nOnaylıyor musunuz?")) {
+                
+                // Kullanıcıya işlemin devam ettiğini gösterelim (UX iyileştirmesi)
+                const btn = document.getElementById('newLessonBtn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Kapatılıyor ve Kaydediliyor...';
+                btn.disabled = true;
+                lucide.createIcons();
+
+                try {
+                    // Arka plandaki Apps Script'e 'bu haftanın gelmeyenlerine X at' sinyali gönder
+                    if(currentSession && currentWeek) {
+                        await fetchFromGAS('finalizeWeek', { session: currentSession, week: currentWeek });
+                    }
+                } catch(e) {
+                    console.error("Otomatik devamsızlık işlenirken hata oluştu: ", e);
+                    alert("Otomatik 'X' atama işleminde bir hata oluştu ancak oturum kapatılıyor.");
+                }
+
+                // Normal kapatma işlemleri
                 endQrSession(); 
                 clearInterval(pollingInterval); 
                 currentSession = null;
@@ -785,7 +806,7 @@
                 
                 document.getElementById('setupContainer').classList.remove('hidden');
                 document.getElementById('activeSessionInfo').classList.add('hidden');
-                document.getElementById('newLessonBtn').classList.add('hidden');
+                btn.classList.add('hidden'); // Butonu gizle (id=newLessonBtn)
                 
                 // Form inputlarını sıfırla
                 document.getElementById('classNameInput').value = '';
@@ -795,6 +816,11 @@
                 
                 document.getElementById('startQrBtn').innerHTML = '<i data-lucide="qr-code"></i> Karekodu Göster';
                 document.getElementById('expiredMessage').classList.add('hidden');
+                
+                // Butonu eski haline getir
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                
                 lucide.createIcons();
             }
         }
