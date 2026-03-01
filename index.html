@@ -571,13 +571,17 @@
             openSettings();
         }
 
-        // DÜZENLENDİ: İsim doldurma fonksiyonu (Yarış durumunu engellemek için dışarı alındı)
+        // DÜZENLENDİ: İsim doldurma fonksiyonu (Excel'deki formatları yoksayan zırhlı filtre eklendi)
         function checkAndFillStudentName(val) {
             const nameInput = document.getElementById('stdName');
             const helperText = document.getElementById('nameHelperText');
             
-            if(val.length > 2 && preloadedStudents.length > 0) {
-                const found = preloadedStudents.find(s => String(s.number).trim() === String(val).trim());
+            // Öğrenci numarasına yanlışlıkla eklenen nokta veya boşlukları siler (Örn: 20.230.101 -> 20230101)
+            const cleanVal = String(val).trim().replace(/[.,\s]/g, ""); 
+            
+            if(cleanVal.length > 2 && preloadedStudents.length > 0) {
+                // Listeden eşleşeni bulur
+                const found = preloadedStudents.find(s => String(s.number).replace(/[.,\s]/g, "") === cleanVal);
                 if (found && found.name && found.name.toLowerCase() !== "isimsiz") {
                     nameInput.value = found.name;
                     nameInput.classList.add('bg-emerald-50', 'border-emerald-400', 'text-emerald-700');
@@ -622,22 +626,54 @@
                 sessionStorage.setItem('yoklama_sheet_gid', urlGid);
             }
 
-            // DÜZENLENDİ: Öğrenci ekranı açıldığında Excel'deki sınıf listesini çek ve bekletme mekanizmasını yönet
-            if (urlSheetId) {
+            // DÜZENLENDİ: 2 SAAT KURALI (Aynı oturuma 2 saat boyunca girilemez)
+            // Öğrenci başka bir hocanın QR kodunu okuttuğunda 'currentSession' farklı olacağı için sorunsuz girebilir.
+            const sessionKey = 'attended_' + currentSession;
+            const savedTime = localStorage.getItem(sessionKey);
+            const hasCookie = getCookie(sessionKey);
+            
+            let isAlreadyAttended = false;
+            if (hasCookie) {
+                isAlreadyAttended = true;
+            } else if (savedTime && parseInt(savedTime) > Date.now()) {
+                isAlreadyAttended = true;
+            } else if (savedTime) {
+                localStorage.removeItem(sessionKey); // Süre dolmuşsa temizle
+            }
+
+            if(!currentSession) {
+                showStudentError('Geçersiz veya hatalı karekod bağlantısı!');
+            } else if (isAlreadyAttended) {
+                showStudentError(`
+                    <i data-lucide="alert-triangle" class="w-12 h-12 md:w-16 md:h-16 mx-auto mb-4 opacity-80 text-amber-500"></i>
+                    <span class="text-amber-600 text-base md:text-lg">Bu derse zaten imza attınız!</span>
+                    <span class="text-xs md:text-sm font-normal text-slate-500 mt-2 block">Aynı oturuma 2 saat içinde tekrar imza atılamaz.</span>
+                `, false);
+            } else if (qrTimestamp && (Date.now() - parseInt(qrTimestamp) > 20000)) {
+                showStudentError(`
+                    <i data-lucide="clock" class="w-12 h-12 md:w-16 md:h-16 mx-auto mb-4 opacity-80 text-red-500"></i>
+                    <span class="text-red-500 text-base md:text-lg">Karekodun süresi dolmuş!</span>
+                    <span class="text-xs md:text-sm font-normal text-slate-500 mt-2 block">Lütfen tahtadaki güncel karekodu okutun.</span>
+                `, false);
+            } else if (!getSheetId()) {
+                showStudentError('Öğretmen Excel bağlantısını kurmamış.');
+            }
+
+            // DÜZENLENDİ: Yükleniyor ibaresi yönetimi ve gecikme kaynaklı sorunların çözümü
+            if (urlSheetId && !isAlreadyAttended) {
                 const loadingText = document.getElementById('loadingListText');
                 if(loadingText) {
                     loadingText.classList.remove('hidden');
                     lucide.createIcons();
                 }
 
-                // fetchFromGAS fonksiyonunu kullanarak güvenli liste çekimi
                 fetchFromGAS('getStudentList')
                 .then(result => {
-                    if (loadingText) loadingText.classList.add('hidden'); // Yükleme bitince yazıyı kaldır
+                    if (loadingText) loadingText.classList.add('hidden'); 
                     if (result && result.success && result.data) {
                         preloadedStudents = result.data;
                         
-                        // ÖNEMLİ: Öğrenci numarasını liste gelmeden ÖNCE yazdıysa hemen şimdi kontrol et!
+                        // Öğrenci numarayı liste gelmeden çok hızlı yazdıysa, liste geldiği an anında kontrol eder!
                         const currentNo = document.getElementById('stdNo').value.trim();
                         if (currentNo.length > 2) {
                             checkAndFillStudentName(currentNo);
@@ -650,28 +686,11 @@
                 });
             }
 
-            // DÜZENLENDİ: Numara girildikçe ismi otomatik tamamlama
+            // Numara girildikçe ismi otomatik tamamlama dinleyicisi
             document.getElementById('stdNo').addEventListener('input', (e) => {
                 checkAndFillStudentName(e.target.value.trim());
             });
 
-            // Gelişmiş Kontrol: Cihaz hem local hem de cookie belleğinden sorgulanır
-            if(!currentSession) {
-                showStudentError('Geçersiz veya hatalı karekod bağlantısı!');
-            } else if (localStorage.getItem('attended_' + currentSession) || getCookie('attended_' + currentSession)) {
-                showStudentError(`
-                    <i data-lucide="alert-triangle" class="w-12 h-12 md:w-16 md:h-16 mx-auto mb-4 opacity-80 text-amber-500"></i>
-                    <span class="text-amber-600 text-base md:text-lg">Bu cihazdan zaten imza atılmış!</span>
-                `, false);
-            } else if (qrTimestamp && (Date.now() - parseInt(qrTimestamp) > 20000)) {
-                showStudentError(`
-                    <i data-lucide="clock" class="w-12 h-12 md:w-16 md:h-16 mx-auto mb-4 opacity-80 text-red-500"></i>
-                    <span class="text-red-500 text-base md:text-lg">Karekodun süresi dolmuş!</span>
-                    <span class="text-xs md:text-sm font-normal text-slate-500 mt-2 block">Lütfen tahtadaki güncel karekodu okutun.</span>
-                `, false);
-            } else if (!getSheetId()) {
-                showStudentError('Öğretmen Excel bağlantısını kurmamış.');
-            }
         } else {
             document.getElementById('teacherView').classList.remove('hidden');
             document.getElementById('teacherView').classList.add('flex');
@@ -1558,8 +1577,10 @@
         window.submitAttendance = async (e) => {
             e.preventDefault();
             
-            if (localStorage.getItem('attended_' + currentSession) || getCookie('attended_' + currentSession)) {
-                alert("Bu cihazdan zaten imza atılmış!");
+            // Çift Yönlü Güvenlik Taraması
+            const sessionKey = 'attended_' + currentSession;
+            if (localStorage.getItem(sessionKey) || getCookie(sessionKey)) {
+                alert("Bu oturuma 2 saat içerisinde tekrar giriş yapamazsınız!");
                 return;
             }
 
@@ -1600,8 +1621,10 @@
                     return;
                 }
 
-                localStorage.setItem('attended_' + currentSession, 'true');
-                document.cookie = `attended_${currentSession}=true; max-age=86400; path=/`; 
+                // DÜZENLENDİ: 2 Saatlik (7200sn) Zaman Ayarlı Kilit (Aynı hoca aynı oturum için)
+                const expireTime = Date.now() + (2 * 60 * 60 * 1000); 
+                localStorage.setItem(sessionKey, expireTime.toString());
+                document.cookie = `${sessionKey}=true; max-age=7200; path=/`; 
                 
                 localStorage.setItem('saved_stdNo', stdNo);
                 localStorage.setItem('saved_stdName', stdName);
